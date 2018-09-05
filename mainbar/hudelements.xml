@@ -20,7 +20,7 @@
     <Button name="GwPlayerHealthGlobeClickOverlay" registerForClicks="LeftButtonUp,RightButtonUp" topLevel="true" frameStrata="HIGH" enableMouse="true" parent="UIParent" inherits="SecureUnitButtonTemplate" virtual="true">
         <Size x="104" y="104"></Size>
         <Anchors>
-            <Anchor point="BOTTOM" x="0" y="16"/>
+            <Anchor point="BOTTOM" x="0" y="26"/>
         </Anchors>
 
     </Button>
@@ -28,7 +28,7 @@
 
         <Size x="104" y="104"></Size>
         <Anchors>
-            <Anchor point="BOTTOM" x="0" y="16"/>
+            <Anchor point="BOTTOM" x="0" y="26"/>
         </Anchors>
         <Layers>
             <Layer level="BORDER">
@@ -302,7 +302,7 @@
     <Frame name="GwPlayerPowerBar" parent="UIParent" virtual="true">
         <Size x="318" y="20"></Size>
         <Anchors>
-            <Anchor point="BOTTOMLEFT" relativePoint="BOTTOM" x="53" y="86"></Anchor>
+            <Anchor point="BOTTOMLEFT" relativePoint="BOTTOM" x="44" y="145"></Anchor>
         </Anchors>
         <Layers>
             <Layer level="BACKGROUND">
@@ -374,7 +374,7 @@
     <Frame name="GwPlayerClassPower" frameStrata="MEDIUM" parent="UIParent" virtual="true">
         <Size x="316" y="18"></Size>
         <Anchors>
-            <Anchor point="BOTTOMLEFT" relativePoint="BOTTOM" x="-372" y="81"></Anchor>
+            <Anchor point="BOTTOMRIGHT" relativePoint="BOTTOM" x="0" y="145"></Anchor>
         </Anchors>
         <Layers>
             <Layer level="BACKGROUND">
