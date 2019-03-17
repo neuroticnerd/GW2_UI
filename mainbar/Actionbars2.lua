@@ -9,7 +9,6 @@ local AddUpdateCB = GW.AddUpdateCB
 
 local MAIN_MENU_BAR_BUTTON_SIZE = 46
 local MAIN_MENU_BAR_BUTTON_MARGIN = 5
-local duringVehicle = false
 
 local GW_BLIZZARD_HIDE_FRAMES = {
     MainMenuBar,
@@ -165,12 +164,9 @@ local function actionBarFrameHide(f, instant)
 end
 GW.AddForProfiling("Actionbars2", "actionBarFrameHide", actionBarFrameHide)
 
+-- gw_DirtySetting - set on load and by trackBarChanges; indicates we are pending changes; handled out of combat and then reset
+-- bar.gw_IsEnabled - set by trackBarChanges; directly tracks if bars are enabled or not; disabled bars never show
 local function fadeCheck(self, forceCombat)
-    local inVehicle = false
-    if OverrideActionBar:IsShown() or C_PetBattles.IsInBattle() then
-        inVehicle = true
-    end
-
     local testFlyout
     if SpellFlyout and SpellFlyout:IsShown() and SpellFlyout:GetParent() then
         testFlyout = SpellFlyout:GetParent():GetParent()
@@ -183,20 +179,20 @@ local function fadeCheck(self, forceCombat)
 
     local mouseOut = self.gw_FadeBottomActionbar
     local inLockdown = InCombatLockdown()
+    local isDirty = self.gw_DirtySetting
 
     for i = 1, 4 do
         local f = self["gw_Bar" .. i]
         if f then
-            if f.gw_NeedsToShow ~= nil and not inLockdown then
-                -- this should only be set on initial load and after a bar setting change
-                if f.gw_NeedsToShow then
+            if isDirty and not inLockdown then
+                -- this should only be set after a bar setting change (including initial load)
+                if f.gw_IsEnabled then
                     f:Show()
                     actionBarFrameShow(f, true)
                 else
                     f:Hide()
                     actionBarFrameHide(f, true)
                 end
-                f.gw_NeedsToShow = nil
             else
                 local inFocus
                 if mouseOut then
@@ -214,18 +210,11 @@ local function fadeCheck(self, forceCombat)
                 end
                 local curAlpha = f:GetAlpha()
                 local busy = (f.fadeIn:IsPlaying() or f.fadeOut:IsPlaying())
-
-                if f:IsShown() and inVehicle and duringVehicle == false and not inCombat then
-                    f:Hide()
-                    duringVehicle = true
-                    return
-                elseif not f:IsShown() and not inVehicle and duringVehicle and not inCombat then
-                    f:Show()
-                    duringVehicle = false
-                    return
+                local forceHide = false
+                if not f.gw_IsEnabled then
+                    forceHide = true
                 end
-
-                if f:IsShown() and not inVehicle and (inFocus or inCombat or isFlyout) then
+                if f:IsShown() and forceHide ~= true and (inFocus or inCombat or isFlyout) then
                     -- should be showing
                     if not busy and curAlpha < 1.0 then
                         actionBarFrameShow(f)
@@ -240,7 +229,7 @@ local function fadeCheck(self, forceCombat)
         end
     end
 
-    if self.gw_NeedsLayout and not inLockdown then
+    if not inLockdown and self.gw_DirtySetting then
         local xOff
         local btn_padding = self.gw_Width
         if self.gw_Bar2:IsShown() then
@@ -250,7 +239,7 @@ local function fadeCheck(self, forceCombat)
         end
         self:ClearAllPoints()
         self:SetPoint("TOP", UIParent, "BOTTOM", xOff, 80)
-        self.gw_NeedsLayout = nil
+        self.gw_DirtySetting = false
     end
 end
 GW.AddForProfiling("Actionbars2", "fadeCheck", fadeCheck)
@@ -279,69 +268,6 @@ local function createFaderAnim(self, state)
     bar.elapsedTimer = -1
     bar.fadeTimer = -1
 end
-
-local MAIN_HUD_FRAMES = {
-    "GwHudArtFrame",
-    "GwMultiBarBottomRight",
-    "GwMultiBarBottomLeft",
-    "GwMultiBarRight",
-    "GwMultiBarLeft",
-    "GwPlayerPowerBar",
-    "GwPlayerAuraFrame",
-    "GwPlayerClassPower",
-    "GwPlayerHealthGlobe",
-    "GwPlayerPetFrame"
-}
-local function toggleMainHud(b, inCombat)
-    for i, name in ipairs(MAIN_HUD_FRAMES) do
-        local f = _G[name]
-        if f then
-            if b then
-                if f.gw_FadeShowing ~= nil then
-                    local bar = f:GetParent()
-                    bar.elapsedTimer = -1
-                    bar.fadeTimer = -1
-                else
-                    if inCombat == nil then
-                        f:SetAlpha(1)
-                    elseif not inCombat then
-                        f:Show()
-                    end
-                    -- f:SetAlpha(1)
-                end
-            else
-                if f.gw_FadeShowing ~= nil then
-                    local bar = f:GetParent()
-                    bar.elapsedTimer = -1
-                    bar.fadeTimer = -1
-                else
-                    if inCombat == nil then
-                        f:SetAlpha(0)
-                    elseif not inCombat then
-                        f:Hide()
-                    end
-                   -- f:SetAlpha(0)
-                end
-            end
-        end
-    end
-end
-
-local function UpdateHudScale(scale)
-    local hudScale = GetSetting("HUD_SCALE")
-    MainMenuBarArtFrame:SetScale(hudScale)
-    for i, name in ipairs(MAIN_HUD_FRAMES) do
-        local f = _G[name]
-        local fm = _G[name .. "MoveAble"]
-        if f then
-            f:SetScale(hudScale)
-        end
-        if fm then
-            fm:SetScale(hudScale)
-        end
-    end
-end
-GW.UpdateHudScale = UpdateHudScale
 
 local function updateHotkey(self, actionButtonType)
     local hotkey = self.HotKey
@@ -481,20 +407,8 @@ end
 GW.AddForProfiling("Actionbars2", "setActionButtonStyle", setActionButtonStyle)
 
 local function main_OnEvent(self, event, ...)
-    local unit = ...
-    local inCombat = UnitAffectingCombat("player")
-    if event == "PET_BATTLE_OPENING_START" then
-        toggleMainHud(false, inCombat)
-    elseif event == "PET_BATTLE_CLOSE" then
-        toggleMainHud(true, inCombat)
-    elseif event == "PLAYER_EQUIPMENT_CHANGED" then
+    if event == "PLAYER_EQUIPMENT_CHANGED" then
         actionBarEquipUpdate()
-    elseif unit == "player" and (event == "UNIT_ENTERED_VEHICLE" or event == "UNIT_EXITED_VEHICLE") then
-        if event == "UNIT_ENTERED_VEHICLE" and OverrideActionBar:IsShown() then
-            toggleMainHud(false, nil)
-        else
-            toggleMainHud(true, nil)
-        end
     elseif event == "PLAYER_REGEN_DISABLED" or event == "PLAYER_REGEN_ENABLED" then
         local forceCombat = (event == "PLAYER_REGEN_DISABLED")
         fadeCheck(self, forceCombat)
@@ -589,29 +503,28 @@ local function updateMainBar(toggle)
         end
     end
 
-    AddUpdateCB(actionBar_OnUpdate, fmActionbar)
+    -- position the main action bar
+    fmActionbar:ClearAllPoints()
+    fmActionbar:SetPoint("TOP", UIParent, "BOTTOM", 0, 80)
     fmActionbar:SetSize(btn_padding, used_height)
     fmActionbar.gw_Width = btn_padding
+
+    -- event/update handlers
+    AddUpdateCB(actionBar_OnUpdate, fmActionbar)
     fmActionbar.gw_FadeBottomActionbar = GetSetting("FADE_BOTTOM_ACTIONBAR")
-    fmActionbar:RegisterEvent("PET_BATTLE_CLOSE")
-    fmActionbar:RegisterEvent("PET_BATTLE_OPENING_START")
     fmActionbar:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
-    fmActionbar:RegisterEvent("UNIT_ENTERED_VEHICLE")
-    fmActionbar:RegisterEvent("UNIT_EXITED_VEHICLE")
     fmActionbar:RegisterEvent("PLAYER_REGEN_DISABLED")
     fmActionbar:RegisterEvent("PLAYER_REGEN_ENABLED")
     fmActionbar:SetScript("OnEvent", main_OnEvent)
-    hooksecurefunc(
-        "MultiActionBar_Update",
-        function()
-            fmActionbar.gw_NeedsLayout = true
-        end
-    )
 
     -- disable default main action bar behaviors
     MainMenuBar:UnregisterAllEvents()
     MainMenuBar:SetScript("OnUpdate", nil)
     MainMenuBar:EnableMouse(false)
+    MainMenuBar:SetMovable(1)
+    MainMenuBar:SetUserPlaced(true)
+    MainMenuBar:SetMovable(0)
+    -- even with IsUserPlaced set, the Blizz multibar handlers mess with the width so reset in fadeCheck DirtySetting
 
     return fmActionbar
 end
@@ -646,11 +559,16 @@ local function trackBarChanges()
         show4 = false
     end
 
-    fmActionbar.gw_Bar1.gw_NeedsToShow = show1
-    fmActionbar.gw_Bar2.gw_NeedsToShow = show2
-    fmActionbar.gw_Bar3.gw_NeedsToShow = show3
-    fmActionbar.gw_Bar4.gw_NeedsToShow = show4
-    fmActionbar.gw_NeedsLayout = true
+    -- set that we'll need to immediately re-calc visible bars and mainbar offset (happens in fadeCheck)
+    fmActionbar.gw_DirtySetting = true
+    fmActionbar.fadeTimer = -1
+    fmActionbar.elapsedTimer = -1
+
+    -- store the new enabled state for each multibar
+    fmActionbar.gw_Bar1.gw_IsEnabled = show1
+    fmActionbar.gw_Bar2.gw_IsEnabled = show2
+    fmActionbar.gw_Bar3.gw_IsEnabled = show3
+    fmActionbar.gw_Bar4.gw_IsEnabled = show4
 end
 
 local function updateMultiBar(barName, buttonName, actionPage, state)
@@ -663,6 +581,7 @@ local function updateMultiBar(barName, buttonName, actionPage, state)
     local btn_this_row = 0
 
     local fmMultibar = CreateFrame("FRAME", "Gw" .. barName, UIParent, "GwMultibarTmpl")
+    GW.MixinHideDuringPetAndOverride(fmMultibar)
     if actionPage ~= nil then
         fmMultibar:SetAttribute("actionpage", actionPage)
         fmMultibar:SetFrameStrata("LOW")
@@ -724,6 +643,8 @@ local function updateMultiBar(barName, buttonName, actionPage, state)
     -- disable default multibar behaviors
     multibar:UnregisterAllEvents()
     multibar:SetScript("OnUpdate", nil)
+    multibar:SetScript("OnShow", nil)
+    multibar:SetScript("OnHide", nil)
     multibar:EnableMouse(false)
 
     return fmMultibar
@@ -777,6 +698,7 @@ local function setStanceBar()
     GwStanceBarButton:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
     GwStanceBarButton:RegisterEvent("UNIT_POWER_FREQUENT")
     GwStanceBarButton:RegisterEvent("UNIT_HEALTH")
+    GwStanceBarButton:RegisterEvent("UNIT_HEALTH_FREQUENT")
     GwStanceBarButton:SetScript("OnEvent", stance_OnEvent)
 
     if GetNumShapeshiftForms() < 1 then
@@ -935,7 +857,7 @@ local function multiButtons_OnUpdate(self, elapsed, testRange)
 end
 GW.AddForProfiling("Actionbars2", "multiButtons_OnUpdate", multiButtons_OnUpdate)
 
-local updateCap = 60 / 1000 -- cap updates to 60 FPS
+local updateCap = 1 / 60 -- cap updates to 60 FPS
 actionBar_OnUpdate = function(self, elapsed)
     local testRange = false
     local testFade = false
@@ -1046,7 +968,9 @@ local function LoadActionBars()
             "OBJTRACKER_OFFSET_X"
         }
     ) do
-        UIPARENT_MANAGED_FRAME_POSITIONS[frame] = nil
+        if UIPARENT_MANAGED_FRAME_POSITIONS[frame] then
+            UIPARENT_MANAGED_FRAME_POSITIONS[frame] = nil
+        end
     end
 
     -- init our bars

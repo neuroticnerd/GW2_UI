@@ -17,6 +17,7 @@ local displayRewards
 local createOrderBar
 
 local experiencebarAnimation = 0
+local GW_LEVELING_REWARD_AVALIBLE
 
 local gw_reputation_vals = nil
 local gw_honor_vals = nil
@@ -179,6 +180,9 @@ local function xpbar_OnEvent(self, event)
             end
         )
     end
+    if event == "UPDATE_FACTION" and not GW.inWorld then
+        return
+    end
 
     displayRewards()
 
@@ -224,6 +228,7 @@ local function xpbar_OnEvent(self, event)
     _G["GwExperienceFrameBar"]:SetStatusBarColor(0.83, 0.57, 0)
 
     gw_reputation_vals = nil
+    local name, description, standingId, bottomValue, topValue, earnedValue, atWarWith, canToggleAtWar, isHeader, isCollapsed, hasRep, isWatched, isChild
     if level == Nextlevel then
         for factionIndex = 1, GetNumFactions() do
             name,
@@ -612,13 +617,13 @@ GW.AddForProfiling("hud", "xpbar_OnEvent", xpbar_OnEvent)
 
 local function animateAzeriteBar(self, elapsed)
     self:SetPoint(
-        "RIGHT",  
+        "RIGHT",
         ArtifactBarSpark,
         'RIGHT',
         0,
         0
     )
-    speed = 0.01
+    local speed = 0.01
     self.prog = self.prog + (speed * elapsed)
     if self.prog > 1 then
         self.prog = 0
@@ -752,7 +757,6 @@ registerActionHudAura(
     "Interface\\AddOns\\GW2_UI\\textures\\leftshadow_holy",
     "Interface\\AddOns\\GW2_UI\\textures\\rightshadow_holy"
 )
-
 registerActionHudAura(
     5487,
     "Interface\\AddOns\\GW2_UI\\textures\\leftshadow_bear",
@@ -767,6 +771,29 @@ registerActionHudAura(
     51271,
     "Interface\\AddOns\\GW2_UI\\textures\\leftshadow_frost",
     "Interface\\AddOns\\GW2_UI\\textures\\rightshadow_frost"
+)
+registerActionHudAura(
+    162264,
+    "Interface\\AddOns\\GW2_UI\\textures\\leftshadow_metamorph",
+    "Interface\\AddOns\\GW2_UI\\textures\\rightshadow_metamorph"
+)
+registerActionHudAura(
+    187827,
+    "Interface\\AddOns\\GW2_UI\\textures\\leftshadow_metamorph",
+    "Interface\\AddOns\\GW2_UI\\textures\\rightshadow_metamorph"
+)
+registerActionHudAura(
+    215785,
+    "Interface\\AddOns\\GW2_UI\\textures\\leftshadow_shaman_fire",
+    "Interface\\AddOns\\GW2_UI\\textures\\rightshadow_shaman_fire"
+)registerActionHudAura(
+    77762,
+    "Interface\\AddOns\\GW2_UI\\textures\\leftshadow_shaman_fire",
+    "Interface\\AddOns\\GW2_UI\\textures\\rightshadow_shaman_fire"
+)registerActionHudAura(
+    201846,
+    "Interface\\AddOns\\GW2_UI\\textures\\leftshadow_shaman_storm",
+    "Interface\\AddOns\\GW2_UI\\textures\\rightshadow_shaman_storm"
 )
 
 local function LoadBreathMeter()
@@ -1152,6 +1179,9 @@ end
 GW.AddForProfiling("hud", "latencyToolTip", latencyToolTip)
 
 local function talentMicro_OnEvent()
+    if not GW.inWorld then
+        return
+    end
     if GetNumUnspentTalents() > 0 then
         _G["GwMicroButtonTalentMicroButtonTexture"]:Show()
         _G["GwMicroButtonTalentMicroButtonString"]:Show()
@@ -1432,6 +1462,9 @@ local function LoadMicroMenu()
 
     -- fix tutorial alerts and hide the micromenu bar
     MicroButtonAndBagsBar:Hide()
+    MicroButtonAndBagsBar:SetMovable(1)
+    MicroButtonAndBagsBar:SetUserPlaced(true)
+    MicroButtonAndBagsBar:SetMovable(0)
     -- talent alert is always hidden by actionbars because we have a custom # on the button instead
     modifyMicroAlert(CollectionsMicroButtonAlert, GwMicroButtonCollectionsMicroButton)
     modifyMicroAlert(LFDMicroButtonAlert, GwMicroButtonLFDMicroButton)
@@ -1564,8 +1597,8 @@ displayRewards = function()
     for k, v in pairs(GW_LEVELING_REWARDS) do
         if v["level"] > UnitLevel("player") then
             
-            if _G["GwLevelingRewardsItem" .. i].mask~=nil then
-                _G["GwLevelingRewardsItem" .. i].icon:AddMaskTexture(nil)
+            if _G["GwLevelingRewardsItem" .. i].mask ~= nil then
+                _G["GwLevelingRewardsItem" .. i].icon:RemoveMaskTexture(_G["GwLevelingRewardsItem" .. i].mask)
             end
             
             _G["GwLevelingRewardsItem" .. i]:Show()
@@ -1578,38 +1611,28 @@ displayRewards = function()
                 _G["GwLevelingRewardsItem" .. i].icon:SetTexture(icon)
                 _G["GwLevelingRewardsItem" .. i].name:SetText(name)
                 _G["GwLevelingRewardsItem" .. i]:SetScript(
-                    "OnEnter",
-                    function()
+                    "OnEnter", function()
                         GameTooltip:SetOwner(GwLevelingRewards, "ANCHOR_CURSOR", 0, 0)
                         GameTooltip:ClearLines()
                         GameTooltip:SetSpellByID(v["id"])
                         GameTooltip:Show()
-                    end
-                )
+                    end)
                 if IsPassiveSpell(v["id"]) then
                     if not _G["GwLevelingRewardsItem" .. i].mask then
-                    local mask = UIParent:CreateMaskTexture()
-                    mask:SetPoint("CENTER", _G["GwLevelingRewardsItem" .. i].icon, "CENTER", 0, 0)
-                    mask:SetTexture(
-                        "Interface\\AddOns\\GW2_UI\\textures\\talents\\passive_border",
-                        "CLAMPTOBLACKADDITIVE",
-                        "CLAMPTOBLACKADDITIVE"
-                        )
-                    mask:SetSize(40, 40)
-                    _G["GwLevelingRewardsItem" .. i].mask = mask
-                    _G["GwLevelingRewardsItem" .. i].icon:AddMaskTexture(mask)
-                    else
-                        _G["GwLevelingRewardsItem" .. i].icon:AddMaskTexture(mask)
+                        local mask = UIParent:CreateMaskTexture()
+                        mask:SetPoint("CENTER", _G["GwLevelingRewardsItem" .. i].icon, "CENTER", 0, 0)
+                        mask:SetTexture(
+                            "Interface\\AddOns\\GW2_UI\\textures\\talents\\passive_border",
+                            "CLAMPTOBLACKADDITIVE",
+                            "CLAMPTOBLACKADDITIVE"
+                            )
+                        mask:SetSize(40, 40)
+                        _G["GwLevelingRewardsItem" .. i].mask = mask
                     end
-                else
-                    if _G["GwLevelingRewardsItem" .. i].mask~=nil then
-                        _G["GwLevelingRewardsItem" .. i].icon:AddMaskTexture(nil)
-                    end
-                end
-                
+                    _G["GwLevelingRewardsItem" .. i].icon:AddMaskTexture(_G["GwLevelingRewardsItem" .. i].mask)
+                end    
                 _G["GwLevelingRewardsItem" .. i]:SetScript("OnLeave", GameTooltip_Hide)
-            end
-            if v["type"] == "TALENT" then
+            elseif v["type"] == "TALENT" then
                 _G["GwLevelingRewardsItem" .. i].icon:SetTexture("Interface\\AddOns\\GW2_UI\\textures\\talent-icon")
                 _G["GwLevelingRewardsItem" .. i].name:SetText(BONUS_TALENTS)
                 _G["GwLevelingRewardsItem" .. i]:SetScript(
@@ -1690,6 +1713,9 @@ end
 GW.AddForProfiling("hud", "updateOrderBar", updateOrderBar)
 
 local function orderBar_OnEvent(self, event)
+    if event ~= "PLAYER_ENTERING_WORLD" and not GW.inWorld then
+        return
+    end
     if OrderHallCommandBar then
         OrderHallCommandBar:SetShown(false)
         OrderHallCommandBar:UnregisterAllEvents()
@@ -1717,6 +1743,7 @@ createOrderBar = function()
     GwOrderhallBar:RegisterUnitEvent("UNIT_AURA", "player")
     GwOrderhallBar:RegisterUnitEvent("UNIT_PHASE", "player")
     GwOrderhallBar:RegisterEvent("PLAYER_ALIVE")
+    GwOrderhallBar:RegisterEvent("PLAYER_ENTERING_WORLD")
 
     local inOrderHall = C_Garrison.IsPlayerInGarrison(LE_GARRISON_TYPE_7_0)
     if inOrderHall then
@@ -1780,7 +1807,7 @@ local function hud_OnEvent(self, event, ...)
         end
     elseif event == "PLAYER_REGEN_DISABLED" or event == "PLAYER_REGEN_ENABLED" then
         selectBg()
-    elseif event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH" then
+    elseif event == "UNIT_HEALTH" or event == "UNIT_HEALTH_FREQUENT" or event == "UNIT_MAXHEALTH" then
         local unit = ...
         if unit == "player" then
             combatHealthState()
@@ -1791,6 +1818,7 @@ GW.AddForProfiling("hud", "hud_OnEvent", hud_OnEvent)
 
 local function LoadHudArt()
     local hudArtFrame = CreateFrame("Frame", "GwHudArtFrame", UIParent, "GwHudArtFrame")
+    GW.MixinHideDuringPetAndOverride(hudArtFrame)
 
     if not GetSetting("BORDER_ENABLED") and hudArtFrame.edgeTint then
         for _, f in ipairs(hudArtFrame.edgeTint) do
@@ -1805,6 +1833,7 @@ local function LoadHudArt()
     hudArtFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
     hudArtFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
     hudArtFrame:RegisterEvent("UNIT_HEALTH")
+    hudArtFrame:RegisterEvent("UNIT_HEALTH_FREQUENT")
     hudArtFrame:RegisterEvent("UNIT_MAXHEALTH")
     selectBg()
     combatHealthState()
@@ -1815,6 +1844,7 @@ local function LoadXPBar()
     loadRewards()
 
     local experiencebar = CreateFrame("Frame", "GwExperienceFrame", UIParent, "GwExperienceBar")
+    GW.MixinHideDuringPet(experiencebar)
     GwlevelLableRightButton:SetScript("OnClick", xpbar_OnClick)
     
     _G["GwExperienceFrameArtifactBar"].animation:SetScript('OnShow', function()
@@ -1845,6 +1875,7 @@ local function LoadXPBar()
     experiencebar:RegisterEvent("PLAYER_UPDATE_RESTING")
     experiencebar:RegisterEvent("CHAT_MSG_COMBAT_HONOR_GAIN")
     experiencebar:RegisterEvent("PLAYER_ENTERING_BATTLEGROUND")
+    experiencebar:RegisterEvent("PLAYER_ENTERING_WORLD")
 
     experiencebar:SetScript("OnEnter", xpbar_OnEnter)
     experiencebar:SetScript(

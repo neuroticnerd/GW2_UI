@@ -155,7 +155,7 @@ end
 local animations = {}
 GW.animations = animations
 local function AddToAnimation(name, from, to, start, duration, method, easeing, onCompleteCallback, doCompleteOnOverider)
-    newAnimation = true
+    local newAnimation = true
     if animations[name] ~= nil then
         if (animations[name]["start"] + animations[name]["duration"]) > GetTime() then
             newAnimation = false
@@ -291,7 +291,7 @@ end
 GW.Bar = Bar
 
 local function SetClassIcon(self, class)
-    if class == nil or class > 12 then
+    if class == nil then
         class = 0
     end
 
@@ -392,15 +392,35 @@ local function gw_OnUpdate(self, elapsed)
 end
 GW.AddForProfiling("index", "gw_OnUpdate", gw_OnUpdate)
 
-local function gw_OnEvent(self, event, name)
-    if loaded then
-        return
+local SCALE_HUD_FRAMES = {
+    "GwHudArtFrame",
+    "GwPlayerPowerBar",
+    "GwPlayerAuraFrame",
+    "GwPlayerClassPower",
+    "GwPlayerHealthGlobe",
+    "GwPlayerPetFrame",
+    "GwMultiBarBottomRight",
+    "GwMultiBarBottomLeft",
+    "GwMultiBarRight",
+    "GwMultiBarLeft"
+}
+local function UpdateHudScale(scale)
+    local hudScale = GetSetting("HUD_SCALE")
+    MainMenuBarArtFrame:SetScale(hudScale)
+    for i, name in ipairs(SCALE_HUD_FRAMES) do
+        local f = _G[name]
+        local fm = _G[name .. "MoveAble"]
+        if f then
+            f:SetScale(hudScale)
+        end
+        if fm then
+            fm:SetScale(hudScale)
+        end
     end
-    if event ~= "PLAYER_LOGIN" then
-        return
-    end
-    loaded = true
+end
+GW.UpdateHudScale = UpdateHudScale
 
+local function loadAddon(self)
     -- setup our frame pool
     GW.Pools = CreatePoolCollection()
 
@@ -556,11 +576,29 @@ local function gw_OnEvent(self, event, name)
         GW.Notice(GwLocalization["DISABLED_MA_BAGS"])
     end
 
-    l:SetScript("OnUpdate", gw_OnUpdate)
+    self:SetScript("OnUpdate", gw_OnUpdate)
+end
+GW.AddForProfiling("index", "loadAddon", loadAddon)
+
+-- handles addon loading
+local function gw_OnEvent(self, event, ...)
+    if event == "PLAYER_LOGIN" then
+        if not loaded then
+            loaded = true
+            loadAddon(self)
+        end
+    elseif event == "PLAYER_LEAVING_WORLD" then
+        GW.inWorld = false
+    elseif event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_ENTERING_BATTLEGROUND" then
+        GW.inWorld = true
+    end
 end
 GW.AddForProfiling("index", "gw_OnEvent", gw_OnEvent)
 l:SetScript("OnEvent", gw_OnEvent)
 l:RegisterEvent("PLAYER_LOGIN")
+l:RegisterEvent("PLAYER_LEAVING_WORLD")
+l:RegisterEvent("PLAYER_ENTERING_WORLD")
+l:RegisterEvent("PLAYER_ENTERING_BATTLEGROUND")
 
 local function AddToClique(frame)
     if type(frame) == "string" then

@@ -82,6 +82,25 @@ local function setItemButtonQuality(button, quality, itemIDOrLink)
 end
 GW.AddForProfiling("paperdoll_equipment", "setItemButtonQuality", setItemButtonQuality)
 
+local function setItemLevel(button, quality, itemLink)
+    button.itemlevel:SetFont(UNIT_NAME_FONT, 12, "THINOUTLINED")
+    if quality then
+        if quality >= LE_ITEM_QUALITY_COMMON and BAG_ITEM_QUALITY_COLORS[quality] then
+            button.itemlevel:SetTextColor(
+                BAG_ITEM_QUALITY_COLORS[quality].r,
+                BAG_ITEM_QUALITY_COLORS[quality].g,
+                BAG_ITEM_QUALITY_COLORS[quality].b,
+                1
+            )
+        end
+        local lvl = GW.GetRealItemLevel(itemLink)
+        button.itemlevel:SetText(lvl)
+    else
+        button.itemlevel:SetText("")
+    end
+end
+GW.AddForProfiling("paperdoll_equipment", "setItemLevel", setItemLevel)
+
 local function updateBagItemButton(button)
     local location = button.location
     if (not location) then
@@ -91,6 +110,7 @@ local function updateBagItemButton(button)
         EquipmentManager_GetItemInfoByLocation(location)
     button.ItemId = id
     local broken = (maxDurability and durability == 0)
+    
     if (textureName) then
         SetItemButtonTexture(button, textureName)
         SetItemButtonCount(button, count)
@@ -116,8 +136,9 @@ local function updateBagItemButton(button)
             setTooltip()
         end
 
-        setItemButtonQuality(button, quality, id)
+        --setItemButtonQuality(button, quality, id)
     end
+    
 end
 GW.AddForProfiling("paperdoll_equipment", "updateBagItemButton", updateBagItemButton)
 
@@ -363,6 +384,7 @@ local function updateItemSlot(self)
 
     local quality = GetInventoryItemQuality("player", slot)
     setItemButtonQuality(self, quality, GetInventoryItemID("player", slot))
+    setItemLevel(self, quality, GetInventoryItemLink("player", slot))
 
     if self.HasPaperDollAzeriteItemOverlay then
         self:SetAzeriteItem(self.hasItem and ItemLocation:CreateFromEquipmentSlot(slot) or nil)
@@ -467,7 +489,7 @@ getBagSlotFrame = function(i)
         return _G["gwPaperDollBagSlotButton" .. i]
     end
 
-    local f = CreateFrame("Button", "gwPaperDollBagSlotButton" .. i, GwPaperDollBagItemList, "GwPaperDollBagItem")
+    local f = CreateFrame("ItemButton", "gwPaperDollBagSlotButton" .. i, GwPaperDollBagItemList, "GwPaperDollBagItem")
     --f:SetScript("OnShow", itemSlot_OnShow)
     --f:SetScript("OnHide", itemSlot_OnHide)
     f:SetScript("OnEvent", itemSlot_OnEvent)
@@ -671,10 +693,14 @@ local function stats_OnEvent(self, event, ...)
     local unit = ...
     if
         (event == "PLAYER_ENTERING_WORLD" or event == "UNIT_MODEL_CHANGED" or
-            event == "UNIT_NAME_UPDATE" and unit == "player")
+            (event == "UNIT_NAME_UPDATE" and unit == "player"))
      then
         GwDressingRoom.model:SetUnit("player", false)
         updateUnitData()
+        return
+    end
+
+    if not GW.inWorld then
         return
     end
 

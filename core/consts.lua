@@ -6,6 +6,7 @@ GW.PowerBarColorCustom = PowerBarColorCustom
 PowerBarColorCustom["MANA"] = {r = 37 / 255, g = 133 / 255, b = 240 / 255}
 PowerBarColorCustom["RAGE"] = {r = 240 / 255, g = 66 / 255, b = 37 / 255}
 PowerBarColorCustom["ENERGY"] = {r = 240 / 255, g = 200 / 255, b = 37 / 255}
+PowerBarColorCustom["POWER_TYPE_ENERGY"] = PowerBarColorCustom["ENERGY"]
 PowerBarColorCustom["LUNAR_POWER"] = {r = 130 / 255, g = 172 / 255, b = 230 / 255}
 PowerBarColorCustom["RUNIC_POWER"] = {r = 37 / 255, g = 214 / 255, b = 240 / 255}
 PowerBarColorCustom["FOCUS"] = {r = 240 / 255, g = 121 / 255, b = 37 / 255}
@@ -13,6 +14,12 @@ PowerBarColorCustom["FURY"] = {r = 166 / 255, g = 37 / 255, b = 240 / 255}
 PowerBarColorCustom["PAIN"] = {r = 255/255, g = 156/255, b = 0}
 PowerBarColorCustom["MAELSTROM"] = {r = 0.00, g = 0.50, b = 1.00}
 PowerBarColorCustom["INSANITY"] = {r = 0.40, g = 0, b = 0.80}
+PowerBarColorCustom["CHI"] = {r = 0.71, g = 1.0, b = 0.92}
+
+-- vehicle colors
+PowerBarColorCustom["AMMOSLOT"] = {r = 0.80, g = 0.60, b = 0.00}
+PowerBarColorCustom["FUEL"] = {r = 0.0, g = 0.55, b = 0.5}
+PowerBarColorCustom["STAGGER"] = {r = 0.52, g = 1.0, b = 0.52}
 
 local DEBUFF_COLOR = {}
 GW.DEBUFF_COLOR = DEBUFF_COLOR
@@ -94,6 +101,18 @@ CLASS_ICONS[9] = {l = 0.0625 * 3, r = 0.0625 * 4, t = 0, b = 1}
 CLASS_ICONS[10] = {l = 0.0625 * 2, r = 0.0625 * 3, t = 0, b = 1}
 CLASS_ICONS[11] = {l = 0.0625 * 1, r = 0.0625 * 2, t = 0, b = 1}
 CLASS_ICONS[12] = {l = 0, r = 0.0625 * 1, t = 0, b = 1}
+CLASS_ICONS["WARRIOR"] = CLASS_ICONS[1]
+CLASS_ICONS["PALADIN"] = CLASS_ICONS[2]
+CLASS_ICONS["HUNTER"] = CLASS_ICONS[3]
+CLASS_ICONS["ROGUE"] = CLASS_ICONS[4]
+CLASS_ICONS["PRIEST"] = CLASS_ICONS[5]
+CLASS_ICONS["DEATHKNIGHT"] = CLASS_ICONS[6]
+CLASS_ICONS["SHAMAN"] = CLASS_ICONS[7]
+CLASS_ICONS["MAGE"] = CLASS_ICONS[8]
+CLASS_ICONS["WARLOCK"] = CLASS_ICONS[9]
+CLASS_ICONS["MONK"] = CLASS_ICONS[10]
+CLASS_ICONS["DRUID"] = CLASS_ICONS[11]
+CLASS_ICONS["DEMONHUNTER"] = CLASS_ICONS[12]
 CLASS_ICONS["dead"] = {l = 0.0625 * 12, r = 0.0625 * 13, t = 0, b = 1}
 
 local CLASS_COLORS_RAIDFRAME = {}
@@ -122,9 +141,10 @@ local TARGET_FRAME_ART = {
     ["minus"] = "Interface\\AddOns\\GW2_UI\\textures\\targetshadow",
     ["normal"] = "Interface\\AddOns\\GW2_UI\\textures\\targetshadow",
     ["elite"] = "Interface\\AddOns\\GW2_UI\\textures\\targetShadowElit",
-    ["worldboss"] = "Interface\\AddOns\\GW2_UI\\textures\\targetShadowElit",
     ["rare"] = "Interface\\AddOns\\GW2_UI\\textures\\targetShadowRare",
     ["rareelite"] = "Interface\\AddOns\\GW2_UI\\textures\\targetShadowRare",
+    ["worldboss"] = "Interface\\AddOns\\GW2_UI\\textures\\targetshadow_boss",
+    ["boss"] = "Interface\\AddOns\\GW2_UI\\textures\\targetshadow_boss",
     ["prestige1"] = "Interface\\AddOns\\GW2_UI\\textures\\targetshadow_p1",
     ["prestige2"] = "Interface\\AddOns\\GW2_UI\\textures\\targetshadow_p2",
     ["prestige3"] = "Interface\\AddOns\\GW2_UI\\textures\\targetshadow_p3",
@@ -146,3 +166,85 @@ DODGEBAR_SPELLS[9] = {48018}
 DODGEBAR_SPELLS[10] = {109132, 115008}
 DODGEBAR_SPELLS[11] = {102280, 102401}
 DODGEBAR_SPELLS[12] = {189110, 195072}
+
+local INDICATORS = {"BAR", "TOPLEFT","TOP", "TOPRIGHT", "LEFT", "CENTER", "RIGHT"}
+GW.INDICATORS = INDICATORS
+
+-- Taken from ElvUI: https://git.tukui.org/elvui/elvui/blob/master/ElvUI/Settings/Filters/UnitFrame.lua
+-- Format: {class = {id = color, ...}, ...}
+local AURAS_INDICATORS = {
+    PRIEST = {
+        [194384] =  {1, 1, 0.66},       -- Atonement
+        [41635] =   {1, 1, 0.66},       -- Prayer of Mending
+        [193065] =  {0.54, 0.21, 0.78}, -- Masochism
+        [139] =     {0.4, 0.7, 0.2},    -- Renew
+        [17] =      {0.7, 0.7, 0.7},    -- Power Word: Shield
+        [47788] =   {0.86, 0.45, 0},    -- Guardian Spirit
+        [33206] =   {0.47, 0.35, 0.74}  -- Pain Suppression
+    },
+    DRUID = {
+        [774] =     {0.8, 0.4, 0.8},    -- Rejuvenation
+        [155777] =  {0.8, 0.4, 0.8},    -- Germination
+        [8936] =    {0.2, 0.8, 0.2},    -- Regrowth
+        [33763] =   {0.4, 0.8, 0.2},    -- Lifebloom
+        [48438] =   {0.8, 0.4, 0},      -- Wild Growth
+        [207386] =  {0.4, 0.2, 0.8},    -- Spring Blossoms
+        [102351] =  {0.2, 0.8, 0.8},    -- Cenarion Ward (Initial Buff)
+        [102352] =  {0.2, 0.8, 0.8},    -- Cenarion Ward (HoT)
+        [200389] =  {1, 1, 0.4},        -- Cultivation
+    },
+    PALADIN = {
+        [53563] =   {0.7, 0.3, 0.7},    -- Beacon of Light
+        [156910] =  {0.7, 0.3, 0.7},    -- Beacon of Faith
+        [200025] =  {0.7, 0.3, 0.7},    -- Beacon of Virtue
+        [1022] =    {0.2, 0.2, 1},      -- Hand of Protection
+        [1044] =    {0.89, 0.45, 0},    -- Hand of Freedom
+        [6940] =    {0.89, 0.1, 0.1},   -- Hand of Sacrifice
+        [223306] =  {0.7, 0.7, 0.3},    -- Bestow Faith
+    },
+    SHAMAN = {
+        [61295] =   {0, 0.4, 0.53},     -- Riptide
+        [974] =     {0.42, 0.74, 0},    -- Earth Shield
+    },
+    MONK = {
+        [119611] =  {0.3, 0.8, 0.6},    -- Renewing Mist
+        [116849] =  {0.2, 0.8, 0.2},    -- Life Cocoon
+        [124682] =  {0.8, 0.8, 0.25},   -- Enveloping Mist
+        [191840] =  {0.27, 0.62, 0.7},  -- Essence Font
+    },
+    ROGUE = {
+        [57934] =   {0.89, 0.09, 0.05}  -- Tricks of the Trade
+    },
+    WARRIOR = {
+        [114030] =  {0.2, 0.2, 1},      -- Vigilance
+        [3411] =    {0.89, 0.09, 0.05}  -- Intervene
+    },
+    HUNTER = {},
+    DEMONHUNTER = {},
+    WARLOCK = {},
+    MAGE = {},
+    DEATHKNIGHT = {},
+    PET = {
+        [193396] =  {0.6, 0.2, 0.8},    -- Demonic Empowerment
+        [19615] =   {0.89, 0.09, 0.05}, -- Frenzy
+        [136] =     {0.2, 0.8, 0.2}     -- Mend Pet
+    }
+}
+GW.AURAS_INDICATORS = AURAS_INDICATORS
+
+-- Never show theses auras
+local AURAS_IGNORED = {
+    57723, -- Sated
+    57724, -- Exhaustion
+    80354, -- Temporal Displacement
+    264689 -- Fatigued
+}
+GW.AURAS_IGNORED = AURAS_IGNORED
+
+-- Show these auras only when they are missing
+local AURAS_MISSING = {
+    21562,  -- Power Word: Fortitude
+    6673,   -- Battle Shout
+    1459    -- Arcane Intellect
+}
+GW.AURAS_MISSING = AURAS_MISSING

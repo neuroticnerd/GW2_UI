@@ -140,17 +140,9 @@ local function updateBonusObjective(self, event)
 
             compassData["PROGRESS"] = 0
 
-            local numFinished = 0
-            local numNotFinished = 0
             local objectiveProgress = 0
             for objectiveIndex = 1, numObjectives do
                 local txt, objectiveType, finished = GetQuestObjectiveInfo(questID, objectiveIndex, false)
-
-                if finished then
-                    numFinished = numFinished + 1
-                else
-                    numNotFinished = numNotFinished + 1
-                end
 
                 compassData["TYPE"] = "EVENT"
 
@@ -170,9 +162,11 @@ local function updateBonusObjective(self, event)
                 end
 
                 if not GwQuesttrackerContainerBonusObjectives.collapsed == true then
-                    objectiveProgress =
-                        objectiveProgress +
-                        addObjectiveBlock(GwBonusObjectiveBlock, txt, finished, objectiveIndex, objectiveType)
+                    if finished then
+                        objectiveProgress = objectiveProgress + (1 / numObjectives) + addObjectiveBlock(GwBonusObjectiveBlock, txt, finished, objectiveIndex, objectiveType)
+                    else
+                        objectiveProgress = objectiveProgress + (addObjectiveBlock(GwBonusObjectiveBlock, txt, finished, objectiveIndex, objectiveType) / numObjectives)
+                    end
                 end
             end
 
@@ -180,7 +174,7 @@ local function updateBonusObjective(self, event)
                 compassData["DESC"] = simpleDesc
             end
 
-            compassData["PROGRESS"] = (numFinished / numObjectives) + (objectiveProgress / numNotFinished)
+            compassData["PROGRESS"] = objectiveProgress
 
             AddTrackerNotification(compassData)
             break
@@ -194,6 +188,12 @@ local function updateBonusObjective(self, event)
         GwBonusHeader:Hide()
     else
         if not GwQuesttrackerContainerBonusObjectives.collapsed == true then
+            --add groupfinder button
+            if C_LFGList.CanCreateQuestGroup(GwBonusObjectiveBlock.questID) then
+                GwBonusObjectiveBlock.joingroup:Show()
+            else
+                GwBonusObjectiveBlock.joingroup:Hide()
+            end
             GwBonusObjectiveBlock:Show()
         end
     end
@@ -231,12 +231,30 @@ local function LoadBonusFrame()
     newBlock.Header:SetTextColor(newBlock.color.r, newBlock.color.g, newBlock.color.b)
     newBlock.hover:SetVertexColor(newBlock.color.r, newBlock.color.g, newBlock.color.b)
 
+    newBlock.joingroup:SetHighlightTexture("Interface\\AddOns\\GW2_UI\\textures\\LFDMicroButton-Down")
+    newBlock.joingroup:SetScript(
+                    "OnClick",
+                    function (self)
+                        local p = self:GetParent()
+                        LFGListUtil_FindQuestGroup(p.questID)
+                    end
+                )
+    newBlock.joingroup:SetScript(
+        "OnEnter",
+        function (self)
+            GameTooltip:SetOwner(self)
+            GameTooltip:AddLine(TOOLTIP_TRACKER_FIND_GROUP_BUTTON, HIGHLIGHT_FONT_COLOR:GetRGB())
+            GameTooltip:Show()
+        end
+    )
+    newBlock.joingroup:SetScript("OnLeave", GameTooltip_Hide)
+
     local header =
         CreateFrame("Button", "GwBonusHeader", GwQuesttrackerContainerBonusObjectives, "GwQuestTrackerHeader")
     header.icon:SetTexCoord(0, 1, 0.5, 0.75)
     header.title:SetFont(UNIT_NAME_FONT, 14)
     header.title:SetShadowOffset(1, -1)
-    header.title:SetText(QUESTS_LABEL)
+    header.title:SetText(EVENTS_LABEL)
 
     GwQuesttrackerContainerBonusObjectives.collapsed = false
     header:SetScript(
@@ -260,8 +278,7 @@ local function LoadBonusFrame()
         TRACKER_TYPE_COLOR["BONUS"].g,
         TRACKER_TYPE_COLOR["BONUS"].b
     )
-    header.title:SetText(EVENTS_LABEL)
-
+    
     updateBonusObjective()
 end
 GW.LoadBonusFrame = LoadBonusFrame

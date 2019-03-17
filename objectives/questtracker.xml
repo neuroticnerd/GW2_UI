@@ -271,6 +271,22 @@
                     </Layer>
                 </Layers>
             </Button>
+             <Button name="$parentJoinGroup" hidden="true" enableMouse="true" registerForClicks="AnyDown" parentKey="joingroup">
+                <Size x="25" y="25"></Size>
+                <Anchors>
+                    <Anchor point="TOPRIGHT" relativePoint="TOPLEFT" x="" y="-25"></Anchor>
+                </Anchors>
+                <Layers>
+                    <Layer level="ARTWORK" textureSubLevel="1">
+                        <Texture parentKey="icon" file="Interface\AddOns\GW2_UI\textures\LFDMicroButton-Down">
+                            <Anchors>
+                                <Anchor point="TOPRIGHT" relativePoint="TOPRIGHT"></Anchor>
+                                <Anchor point="BOTTOMLEFT" relativePoint="BOTOMLEFT"></Anchor>
+                            </Anchors>
+                        </Texture>
+                    </Layer>
+                </Layers>
+            </Button>
         </Frames>
     </Button>
     <Frame name="GwQuesttrackerObjectiveNormal" enableMouse="false" virtual="true">
@@ -354,6 +370,18 @@
                                 <Anchor point="TOPRIGHT" relativePoint="TOPRIGHT" x="0" y="22"></Anchor>
                             </Anchors>
                         </FontString>
+                        <FontString parentKey="timerStringChest2" text="0:00" justifyH="RIGHT">
+                            <Size x="100" y="24"></Size>
+                            <Anchors>
+                                <Anchor point="TOPRIGHT" relativePoint="TOPRIGHT" x="0" y="0"></Anchor>
+                            </Anchors>
+                        </FontString>
+                        <FontString parentKey="timerStringChest3" text="0:00" justifyH="RIGHT">
+                            <Size x="100" y="24"></Size>
+                            <Anchors>
+                                <Anchor point="TOPRIGHT" relativePoint="TOPRIGHT" x="0" y="0"></Anchor>
+                            </Anchors>
+                        </FontString>
                         <FontString parentKey="timerlabel" text="Time Remaining" justifyH="LEFT">
                             <Size x="300" y="24"></Size>
                             <Anchors>
@@ -415,7 +443,7 @@
                     <Frame name="$parent2" parentKey="2">
                         <Size x="38" y="38"></Size>
                         <Anchors>
-                            <Anchor point="TOP" relativePoint="TOP" x="0" y="0"></Anchor>
+                            <Anchor point="TOPLEFT" relativePoint="TOPLEFT" x="75" y="0"></Anchor>
                         </Anchors>
                         <Layers>
                             <layer>
@@ -429,6 +457,22 @@
                         </Layers>
                     </Frame>
                     <Frame name="$parent3" parentKey="3">
+                        <Size x="38" y="38"></Size>
+                        <Anchors>
+                            <Anchor point="TOPRIGHT" relativePoint="TOPRIGHT" x="-90" y="0"></Anchor>
+                        </Anchors>
+                        <Layers>
+                            <layer>
+                                <Texture name="$parentIcon" file="Interface\AddOns\GW2_UI\textures\icon-boss">
+                                    <Size x="38" y="38"></Size>
+                                    <Anchors>
+                                        <Anchor point="CENTER" relativePoint="CENTER" x="0" y="0"></Anchor>
+                                    </Anchors>
+                                </Texture>
+                            </layer>
+                        </Layers>
+                    </Frame>
+                    <Frame name="$parent4" parentKey="4">
                         <Size x="38" y="38"></Size>
                         <Anchors>
                             <Anchor point="TOPRIGHT" relativePoint="TOPRIGHT" x="-10" y="0"></Anchor>
@@ -446,9 +490,48 @@
                     </Frame>
                 </Frames>
             </Frame>
+            <Frame name="TimerBarOverlay" hidden="true" frameLevel="5" toplevel="true" parentKey="chestoverlay">
+                <Size x="1" y="20"></Size>
+                <Anchors>
+                    <Anchor point="BOTTOM" relativePoint="BOTTOM" x="0" y="-20" />
+                </Anchors>
+                <Layers>
+                    <Layer>
+                        <Texture name="chest2" parentKey="chest2" file="Interface\AddOns\GW2_UI\textures\xpbarbg">
+                            <Size x="2" y="23"></Size>
+                        </Texture>
+                        <Texture name="chest3" parentKey="chest3" file="Interface\AddOns\GW2_UI\textures\xpbarbg">
+                            <Size x="2" y="23"></Size>
+                        </Texture>
+                    </Layer>
+                </Layers>
+            </Frame>
+            <Button name="GwDeathCounterButton" hidden="true" frameLevel="5" virtual="true" parentKey="deathcounter">
+                <Size x="30" y="15"></Size>
+                <Layers>
+                    <Layer Level="ARTOWORK">
+                    </Layer>
+                    <Layer Level="BACKGROUND">
+                        <Texture name="$parentIcon" parentKey="icon" file="Interface\AddOns\GW2_UI\textures\party\icon-dead">
+                            <Size x="15" y="15"></Size>
+                            <Anchors>
+                                <Anchor point="CENTER" relativePoint="RIGHT" x="0" y="0"></Anchor>
+                            </Anchors>
+                        </Texture>
+                    </Layer>
+                    <Layer Level="OVERLAY">
+                        <FontString name="$parentString" text="TEST" parentKey="counterlabel" justifyH="RIGHT" justifyV="CENTER">
+                            <Size x="30" y="15"></Size>
+                            <Anchors>
+                                <Anchor point="RIGHT" relativePoint="RIGHT" x="-10" y="0"></Anchor>
+                            </Anchors>
+                        </FontString>
+                    </Layer>
+                </Layers>
+            </Button>
         </Frames>
     </Frame>
-
+    
     <Button inherits="SecureUnitButtonTemplate" name="GwQuestTrackerBossFrame" virtual="true">
         <Size x="300" y="35"></Size>
         <Anchors>
@@ -468,6 +551,12 @@
                         <Anchor point="TOPLEFT" relativePoint="TOPLEFT" x="-17" y="-5"></Anchor>
                     </Anchors>
                 </Texture>
+                <Texture name="$parentMarker" parentKey="marker" hidden="true" file="Interface\AddOns\GW2_UI\textures\party\icon-dead">
+                    <Size x="24" y="24"></Size>
+                    <Anchors>
+                        <Anchor point="TOPLEFT" relativePoint="TOPLEFT" x="-17" y="-5"></Anchor>
+                    </Anchors>
+                </Texture>
             </Layer>
             <Layer level="OVERLAY">
                 <FontString name="$parentString" parentKey="name" text="Objective text 1/2" justifyH="LEFT">
@@ -481,9 +570,74 @@
         <Frames>
 
             <StatusBar name="$parentStatusBar" parentKey="health" defaultValue="1" minValue="0" maxValue="1" drawlayer="BACKGROUND">
-                <Size x="280" y="10"></Size>
+                <Size x="280" y="8"></Size>
                 <Anchors>
                     <Anchor point="TOPRIGHT" relativePoint="TOPRIGHT" x="-10" y="-20"></Anchor>
+                </Anchors>
+                <BarTexture file="Interface\AddOns\GW2_UI\textures\gwstatusbar"/>
+                <Layers>
+                    <Layer level="OVERLAY">
+                        <FontString name="$parentString" parentKey="value" fontSize="12" text="50%" fontColor="white" inherits="GameFontNormalSmall" justifyH="CENTER">
+                            <Color r="1" g="1" b="1"></Color>
+                            <Size x="180" y="8"/>
+                            <Anchors>
+                                <Anchor point="CENTER" x="0" y="0"/>
+                            </Anchors>
+                        </FontString>
+                    </Layer>
+                </Layers>
+            </StatusBar>
+            <StatusBar name="$parentStatusBar" parentKey="power" defaultValue="1" minValue="0" maxValue="1" drawlayer="BACKGROUND">
+                <Size x="280" y="2"></Size>
+                <Anchors>
+                    <Anchor point="TOPRIGHT" relativePoint="TOPRIGHT" x="-10" y="-28"></Anchor>
+                </Anchors>
+                <BarTexture file="Interface\AddOns\GW2_UI\textures\gwstatusbar"/>
+            </StatusBar>
+        </Frames>
+    </Button>
+
+    <Button inherits="SecureUnitButtonTemplate" name="GwQuestTrackerArenaPrepFrame" virtual="true" hidden="true">
+        <Size x="300" y="35"></Size>
+        <Anchors>
+            <Anchor point="TOPRIGHT" relativePoint="TOPRIGHT"></Anchor>
+        </Anchors>
+        <Layers>
+            <Layer level="BACKGROUND">
+                <Texture name="$parentStatusBarBg" file="Interface\AddOns\GW2_UI\textures\gwstatusbar-bg">
+                    <Size x="282" y="12"></Size>
+                    <Anchors>
+                        <Anchor point="TOPRIGHT" relativePoint="TOPRIGHT" x="-9" y="-19"></Anchor>
+                    </Anchors>
+                </Texture>
+                <Texture name="$parentIcon" parentKey="icon" file="Interface\AddOns\GW2_UI\textures\party\classicons">
+                    <Size x="24" y="24"></Size>
+                    <Anchors>
+                        <Anchor point="TOPLEFT" relativePoint="TOPLEFT" x="-17" y="-5"></Anchor>
+                    </Anchors>
+                </Texture>
+            </Layer>
+            <Layer level="OVERLAY">
+                <FontString name="$parentString" parentKey="name" text="Objective text 1/2" justifyH="LEFT">
+                    <Size x="300" y="20"></Size>
+                    <Anchors>
+                        <Anchor point="TOPRIGHT" relativePoint="TOPRIGHT" x="10"></Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+        </Layers>
+        <Frames>
+            <StatusBar name="$parentStatusBar" parentKey="health" defaultValue="1" minValue="0" maxValue="1" drawlayer="BACKGROUND">
+                <Size x="280" y="8"></Size>
+                <Anchors>
+                    <Anchor point="TOPRIGHT" relativePoint="TOPRIGHT" x="-10" y="-20"></Anchor>
+                </Anchors>
+                <BarTexture file="Interface\AddOns\GW2_UI\textures\gwstatusbar"/>
+            </StatusBar>
+            <StatusBar name="$parentStatusBar" parentKey="power" defaultValue="1" minValue="0" maxValue="1" drawlayer="BACKGROUND">
+                <Size x="280" y="2"></Size>
+                <Anchors>
+                    <Anchor point="TOPRIGHT" relativePoint="TOPRIGHT" x="-10" y="-28"></Anchor>
                 </Anchors>
                 <BarTexture file="Interface\AddOns\GW2_UI\textures\gwstatusbar"/>
             </StatusBar>

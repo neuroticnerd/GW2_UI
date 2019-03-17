@@ -3,6 +3,7 @@ local CommaValue = GW.CommaValue
 local RoundDec = GW.RoundDec
 local CharacterMenuBlank_OnLoad = GW.CharacterMenuBlank_OnLoad
 local FACTION_BAR_COLORS = GW.FACTION_BAR_COLORS
+local RT = GW.REP_TEXTURES
 
 -- forward function defs
 local updateOldData
@@ -18,6 +19,10 @@ local INIT_Y = 2
 local OFF_Y = 10
 local DETAIL_H = 65
 local DETAIL_LG_H = (DETAIL_H * 2) + OFF_Y
+--local REPBG_T = 0.27
+--local REPBG_B = 0.73
+local REPBG_T = 0
+local REPBG_B = 0.464
 
 local expandedFactions = {}
 
@@ -138,6 +143,7 @@ GW.AddForProfiling("reputation", "detailsFavorite_OnLeave", detailsFavorite_OnLe
 
 local function detailsControls_OnShow(self)
     self:GetParent().details:Show()
+    self:GetParent().detailsbg:Show()
 
     if self.atwar.isShowAble then
         self.atwar:Show()
@@ -154,6 +160,7 @@ GW.AddForProfiling("reputation", "detailsControls_OnShow", detailsControls_OnSho
 
 local function detailsControls_OnHide(self)
     self:GetParent().details:Hide()
+    self:GetParent().detailsbg:Hide()
 end
 GW.AddForProfiling("reputation", "detailsControls_OnHide", detailsControls_OnHide)
 
@@ -162,12 +169,16 @@ local function details_OnClick(self, button)
         detailFaction(self.item.factionID, false)
         self:SetHeight(DETAIL_H)
         self.item.controles:Hide()
+        self.item.repbg:SetTexCoord(0, 1, REPBG_T, REPBG_B)
+        self.item.repbg:SetDesaturated(true)
     else
         detailFaction(self.item.factionID, true)
         self:SetHeight(DETAIL_LG_H)
         self.item.controles:Show()
+        self.item.repbg:SetTexCoord(0, 1, 0, 1)
+        self.item.repbg:SetDesaturated(false)
     end
-    updateDetails()
+    updateOldData()
 end
 GW.AddForProfiling("reputation", "details_OnClick", details_OnClick)
 
@@ -196,12 +207,14 @@ local function setDetailEx(
     frame.factionIndex = factionIndex
     frame.factionID = factionID
 
+    local isExpanded = false
     if expandedFactions[factionID] == nil then
         frame.controles:Hide()
         frame:GetParent():SetHeight(DETAIL_H)
     else
         frame:GetParent():SetHeight(DETAIL_LG_H)
         frame.controles:Show()
+        isExpanded = true
     end
 
     local currentRank = GetText("FACTION_STANDING_LABEL" .. math.min(8, math.max(1, standingId)), gender)
@@ -302,13 +315,36 @@ local function setDetailEx(
 
     SetFactionInactive(GetSelectedFaction())
 
+    if factionID and RT[factionID] then
+        frame.repbg:SetTexture("Interface/AddOns/GW2_UI/textures/rep/" .. RT[factionID])
+        if isExpanded then
+            frame.repbg:SetTexCoord(0, 1, 0, 1)
+            frame.repbg:SetAlpha(0.85)
+            frame.repbg:SetDesaturated(false)
+        else
+            frame.repbg:SetTexCoord(0, 1, REPBG_T, REPBG_B)
+            frame.repbg:SetAlpha(0.33)
+            frame.repbg:SetDesaturated(true)
+        end
+    else
+        GW.Debug("no faction", name, factionID)
+        frame.repbg:SetAlpha(0)
+    end
+
     if factionID and C_Reputation.IsFactionParagon(factionID) then
-        local currentValue, maxValueParagon, _, _ = C_Reputation.GetFactionParagonInfo(factionID)
+        local currentValue, maxValueParagon, _, hasRewardPending = C_Reputation.GetFactionParagonInfo(factionID)
 
         if currentValue > 10000 then
             repeat
                 currentValue = currentValue - 10000
             until (currentValue < 10000)
+        end
+
+        if hasRewardPending then 
+            local nameReward = name .. "|TInterface\\AddOns\\GW2_UI\\textures\\rewards-icon:32:32:0:0|t"
+            frame.name:SetText(nameReward)
+        else
+            frame.name:SetText(name)
         end
 
         frame.currentRank:SetText(currentRank)
@@ -425,6 +461,7 @@ end
 GW.AddForProfiling("reputation", "setDetail", setDetail)
 
 local facData = {}
+local facOrder = {}
 updateDetails = function()
     local fm = GwRepDetailFrame.scroller
 
@@ -436,6 +473,7 @@ updateDetails = function()
     for k, v in pairs(facData) do
         v.loaded = false
     end
+    table.wipe(facOrder)
 
     -- run through factions to get data and total count for the selected category
     local savedHeaderName = ""
@@ -474,41 +512,42 @@ updateDetails = function()
             savedHeaderName = ""
         end
 
-        if not facData[idx] then
-            facData[idx] = {}
+        if not facData[factionID] then
+            facData[factionID] = {}
         end
-        facData[idx].loaded = true
-        facData[idx].factionIndex = idx
-        facData[idx].name = name
-        facData[idx].desc = desc
-        facData[idx].standingId = standingId
-        facData[idx].bottomValue = bottomValue
-        facData[idx].topValue = topValue
-        facData[idx].earnedValue = earnedValue
-        facData[idx].atWarWith = atWarWith
-        facData[idx].canToggleAtWar = canToggleAtWar
-        facData[idx].isHeader = isHeader
-        facData[idx].isCollapsed = isCollapsed
-        facData[idx].hasRep = hasRep
-        facData[idx].isWatched = isWatched
-        facData[idx].isChild = isChild
-        facData[idx].factionID = factionID
-        facData[idx].hasBonusRepGain = hasBonusRepGain
-        facData[idx].canBeLFGBonus = canBeLFGBonus
-        facData[idx].savedHeaderName = savedHeaderName
+        facOrder[#facOrder + 1] = factionID
+        facData[factionID].loaded = true
+        facData[factionID].factionIndex = idx
+        facData[factionID].name = name
+        facData[factionID].desc = desc
+        facData[factionID].standingId = standingId
+        facData[factionID].bottomValue = bottomValue
+        facData[factionID].topValue = topValue
+        facData[factionID].earnedValue = earnedValue
+        facData[factionID].atWarWith = atWarWith
+        facData[factionID].canToggleAtWar = canToggleAtWar
+        facData[factionID].isHeader = isHeader
+        facData[factionID].isCollapsed = isCollapsed
+        facData[factionID].hasRep = hasRep
+        facData[factionID].isWatched = isWatched
+        facData[factionID].isChild = isChild
+        facData[factionID].factionID = factionID
+        facData[factionID].hasBonusRepGain = hasBonusRepGain
+        facData[factionID].canBeLFGBonus = canBeLFGBonus
+        facData[factionID].savedHeaderName = savedHeaderName
     end
 
     -- run through hybridscroll buttons, setting appropriate faction data by offset & index
     for i = 1, #fm.buttons do
         local idx = i + offset
-        local repIdx = idx + selectedReputationCat
+        local factionID = facOrder[idx]
         local slot = fm.buttons[i].item
 
-        if idx > repCount or not facData[repIdx] or not facData[repIdx].loaded then
+        if idx > repCount or not factionID or not facData[factionID] or not facData[factionID].loaded then
             -- this is an empty/not used button
             slot:Hide()
         else
-            setDetail(slot, facData[repIdx])
+            setDetail(slot, facData[factionID])
         end
     end
 
@@ -562,19 +601,36 @@ local function setupDetail(self)
     self.statusbarbg:SetPoint("BOTTOMRIGHT", self.StatusBar, "BOTTOMRIGHT", 0, -2)
     self.currentRank:SetPoint("TOPLEFT", self.StatusBar, "BOTTOMLEFT", 0, -5)
     self.nextRank:SetPoint("TOPRIGHT", self.StatusBar, "BOTTOMRIGHT", 0, -5)
+
     self.currentRank:SetFont(DAMAGE_TEXT_FONT, 11)
     self.currentRank:SetTextColor(0.6, 0.6, 0.6)
+    self.currentRank:SetShadowColor(0, 0, 0, 1)
+    self.currentRank:SetShadowOffset(1, -1)
+
     self.nextRank:SetFont(DAMAGE_TEXT_FONT, 11)
     self.nextRank:SetTextColor(0.6, 0.6, 0.6)
+    self.nextRank:SetShadowColor(0, 0, 0, 1)
+    self.nextRank:SetShadowOffset(1, -1)
+    
     self.name:SetFont(DAMAGE_TEXT_FONT, 14)
     self.name:SetTextColor(1, 1, 1, 1)
+    self.name:SetShadowColor(0, 0, 0, 1)
+    self.name:SetShadowOffset(1, -1)
+
     self.details:SetFont(UNIT_NAME_FONT, 12)
     self.details:SetTextColor(0.8, 0.8, 0.8, 1)
+    self.details:SetShadowColor(0, 0, 0, 1)
+    self.details:SetShadowOffset(1, -1)
     self.details:Hide()
     self.details:SetWidth(self.StatusBar:GetWidth())
+    self.detailsbg:Hide()
+
     self.currentRank:SetText(REFORGE_CURRENT)
     self.nextRank:SetText(GwLocalization["CHARACTER_NEXT_RANK"])
     self:GetParent():SetScript("OnClick", details_OnClick)
+
+    self.repbg:SetTexCoord(0, 1, REPBG_T, REPBG_B)
+    self.repbg:SetDesaturated(true)
 end
 GW.AddForProfiling("reputation", "setupDetail", setupDetail)
 
@@ -641,6 +697,7 @@ updateReputations = function()
                 header:SetScript(
                     "OnClick",
                     function()
+                        updateSavedReputation()
                         showHeader(factionIndex)
                         updateDetails()
                     end
@@ -697,12 +754,10 @@ local function updateDetailsSearch(s)
     for k, v in pairs(facData) do
         v.loaded = false
     end
+    table.wipe(facOrder)
 
     -- run through factions to get data and total count for the selected category
     local savedHeaderName = ""
-    local idxTbl = {}
-    local idxCount = 0
-    --for idx = selectedReputationCat + 1, GetNumFactions() do
     for idx = 1, GetNumFactions() do
         local name,
             desc,
@@ -742,44 +797,43 @@ local function updateDetailsSearch(s)
                 savedHeaderName = ""
             end
 
-            if not facData[idx] then
-                facData[idx] = {}
+            if not facData[factionID] then
+                facData[factionID] = {}
             end
-            idxCount = idxCount + 1
-            idxTbl[idxCount] = idx
-            facData[idx].loaded = true
-            facData[idx].factionIndex = idx
-            facData[idx].name = name
-            facData[idx].desc = desc
-            facData[idx].standingId = standingId
-            facData[idx].bottomValue = bottomValue
-            facData[idx].topValue = topValue
-            facData[idx].earnedValue = earnedValue
-            facData[idx].atWarWith = atWarWith
-            facData[idx].canToggleAtWar = canToggleAtWar
-            facData[idx].isHeader = isHeader
-            facData[idx].isCollapsed = isCollapsed
-            facData[idx].hasRep = hasRep
-            facData[idx].isWatched = isWatched
-            facData[idx].isChild = isChild
-            facData[idx].factionID = factionID
-            facData[idx].hasBonusRepGain = hasBonusRepGain
-            facData[idx].canBeLFGBonus = canBeLFGBonus
-            facData[idx].savedHeaderName = savedHeaderName
+            facOrder[#facOrder + 1] = factionID
+            facData[factionID].loaded = true
+            facData[factionID].factionIndex = idx
+            facData[factionID].name = name
+            facData[factionID].desc = desc
+            facData[factionID].standingId = standingId
+            facData[factionID].bottomValue = bottomValue
+            facData[factionID].topValue = topValue
+            facData[factionID].earnedValue = earnedValue
+            facData[factionID].atWarWith = atWarWith
+            facData[factionID].canToggleAtWar = canToggleAtWar
+            facData[factionID].isHeader = isHeader
+            facData[factionID].isCollapsed = isCollapsed
+            facData[factionID].hasRep = hasRep
+            facData[factionID].isWatched = isWatched
+            facData[factionID].isChild = isChild
+            facData[factionID].factionID = factionID
+            facData[factionID].hasBonusRepGain = hasBonusRepGain
+            facData[factionID].canBeLFGBonus = canBeLFGBonus
+            facData[factionID].savedHeaderName = savedHeaderName
         end
     end
 
     -- run through hybridscroll buttons, setting appropriate faction data by offset & index
     for i = 1, #fm.buttons do
         local idx = i + offset
+        local factionID = facOrder[idx]
         local slot = fm.buttons[i].item
 
-        if idx > idxCount then
+        if idx > repCount or not factionID or not facData[factionID] or not facData[factionID].loaded then
             -- this is an empty/not used button
             slot:Hide()
         else
-            local repIdx = idxTbl[idx]
-            setDetail(slot, facData[repIdx])
+            setDetail(slot, facData[factionID])
         end
     end
 
@@ -795,7 +849,8 @@ local function dynamicOffset(self, offset)
     local heightSoFar = 0
     local element = 0
     local scrollHeight = 0
-    for k, v in pairs(facData) do
+    for _, factionID in ipairs(facOrder) do
+        local v = facData[factionID]
         if v.loaded then
             local nextHeight
             if expandedFactions[v.factionID] then
@@ -827,6 +882,9 @@ local function LoadReputation(tabContainer)
     fmGPR.categories:EnableMouseWheel(true)
     fmGPR.categories:RegisterEvent("UPDATE_FACTION")
     local fnGPR_OnEvent = function(self, event)
+        if not GW.inWorld then
+            return
+        end
         updateSavedReputation()
         if GwPaperReputation:IsShown() then
             updateOldData()
@@ -858,6 +916,8 @@ local function LoadReputation(tabContainer)
         if self:GetText() == SEARCH .. "..." then
             self:SetText("")
         end
+        --update saved reputations
+        updateSavedReputation()
     end
     fmGPR.input:SetScript("OnEditFocusGained", fnGPR_input_OnEditFocusGained)
     local fnGPR_input_OnEditFocusLost = function(self)

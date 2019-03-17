@@ -178,6 +178,7 @@ local function manageButton()
     fmGGMC:SetScript("OnClick", fnGGMC_OnClick)
     fmGGMC:RegisterEvent("GROUP_ROSTER_UPDATE")
     fmGGMC:RegisterEvent("RAID_ROSTER_UPDATE")
+    fmGGMC:RegisterEvent("PLAYER_ENTERING_WORLD")
 
     local fnGMIG_OnLoad = function(self)
         if IsInGroup() then
@@ -334,10 +335,12 @@ local function updateAwayData(self)
 
     posY, posX, posZ, instanceID = UnitPosition(self.unit)
     _, _, _, playerinstanceID = UnitPosition("player")
-    self.classicon:SetTexture("Interface\\AddOns\\GW2_UI\\textures\\party\\classicons")
-    _, _, classIndex = UnitClass(self.unit)
-    if classIndex ~= nil and classIndex ~= 0 then
-        SetClassIcon(self.classicon, classIndex)
+    if not GW_READY_CHECK_INPROGRESS then 
+        self.classicon:SetTexture("Interface\\AddOns\\GW2_UI\\textures\\party\\classicons")
+        _, _, classIndex = UnitClass(self.unit)
+        if classIndex ~= nil and classIndex ~= 0 then
+            SetClassIcon(self.classicon, classIndex)
+        end
     end
 
     if playerinstanceID ~= instanceID then
@@ -615,6 +618,30 @@ local function updatePartyAuras(self, unit)
 end
 GW.AddForProfiling("party", "updatePartyAuras", updatePartyAuras)
 
+local function setUnitName(self)
+    local nameRoleIcon = {}
+    nameRoleIcon["TANK"] = "|TInterface\\AddOns\\GW2_UI\\textures\\party\\roleicon-tank:16:16:0:0|t "
+    nameRoleIcon["HEALER"] = "|TInterface\\AddOns\\GW2_UI\\textures\\party\\roleicon-healer:16:16:0:0|t "
+    nameRoleIcon["DAMAGER"] = "|TInterface\\AddOns\\GW2_UI\\textures\\party\\roleicon-dps:16:16:0:0|t "
+    nameRoleIcon["NONE"] = ""
+
+    local role = UnitGroupRolesAssigned(self.unit)
+    local nameString = UnitName(self.unit)
+
+    if not nameString or nameString == UNKNOWNOBJECT then
+        self.nameNotLoaded = false
+    else
+        self.nameNotLoaded = true
+    end
+
+    if nameRoleIcon[role] ~= nil then
+        nameString = nameRoleIcon[role] .. nameString
+    end
+    
+    self.name:SetText(nameString)
+end
+GW.AddForProfiling("party", "setUnitName", setUnitName)
+
 local function updatePartyData(self)
     if not UnitExists(self.unit) then
         return
@@ -641,20 +668,7 @@ local function updatePartyData(self)
     self.powerbar:SetValue(powerPrecentage)
 
     updateAwayData(self)
-
-    local nameRoleIcon = {}
-    nameRoleIcon["TANK"] = "|TInterface\\AddOns\\GW2_UI\\textures\\party\\roleicon-tank:16:16:0:0|t "
-    nameRoleIcon["HEALER"] = "|TInterface\\AddOns\\GW2_UI\\textures\\party\\roleicon-healer:16:16:0:0|t "
-    nameRoleIcon["DAMAGER"] = "|TInterface\\AddOns\\GW2_UI\\textures\\party\\roleicon-dps:16:16:0:0|t "
-    nameRoleIcon["NONE"] = ""
-
-    local role = UnitGroupRolesAssigned(self.unit)
-    local nameString = UnitName(self.unit)
-    if nameRoleIcon[role] ~= nil then
-        nameString = nameRoleIcon[role] .. nameString
-    end
-
-    self.name:SetText(nameString)
+    setUnitName(self)
 
     self.level:SetText(UnitLevel(self.unit))
 
@@ -674,7 +688,12 @@ local function party_OnEvent(self, event, unit, arg1)
     if IsInRaid() then
         return
     end
-    if event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH" and unit == self.unit then
+
+    if not self.nameNotLoaded then
+        setUnitName(self)
+    end
+
+    if event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH" or event == "UNIT_HEALTH_FREQUENT" and unit == self.unit then
         local health = UnitHealth(self.unit)
         local healthMax = UnitHealthMax(self.unit)
         local healthPrec = 0
@@ -698,7 +717,9 @@ local function party_OnEvent(self, event, unit, arg1)
     if event == "UNIT_PHASE" or event == "PARTY_MEMBER_DISABLE" or event == "PARTY_MEMBER_ENABLE" then
         updateAwayData(self)
     end
-
+    if event == "UNIT_NAME_UPDATE" and unit == self.unit then
+        setUnitName(self)
+    end
     if event == "UNIT_AURA" and unit == self.unit then
         updatePartyAuras(self, self.unit)
     end
@@ -776,6 +797,7 @@ local function createPartyFrame(i)
 
     frame.unit = registerUnit
     frame.ready = -1
+    frame.nameNotLoaded = false
 
     frame:SetAttribute("unit", registerUnit)
     frame:SetAttribute("*type1", "target")
@@ -783,7 +805,7 @@ local function createPartyFrame(i)
 
     RegisterUnitWatch(frame)
     frame:EnableMouse(true)
-    frame:RegisterForClicks("LeftButtonUp", "RightButtonUp", "Button4Up", "Button5Up")
+    frame:RegisterForClicks("LeftButtonUp", "RightButtonUp", "Button4Up", "Button5Up", "MiddleButtonUp")
 
     frame:SetScript("OnLeave", GameTooltip_Hide)
     frame:SetScript(
@@ -804,22 +826,25 @@ local function createPartyFrame(i)
     frame.healthbar.animationName = registerUnit .. "animation"
     frame.healthbar.animationValue = 0
 
-    frame:RegisterEvent("UNIT_HEALTH")
-    frame:RegisterEvent("UNIT_MAXHEALTH")
-    frame:RegisterEvent("UNIT_ABSORB_AMOUNT_CHANGED")
-    frame:RegisterEvent("UNIT_POWER_FREQUENT")
-    frame:RegisterEvent("UNIT_MAXPOWER")
+    frame:SetScript("OnEvent", party_OnEvent)
+
     frame:RegisterEvent("GROUP_ROSTER_UPDATE")
-    frame:RegisterEvent("UNIT_PHASE")
     frame:RegisterEvent("PARTY_MEMBER_DISABLE")
     frame:RegisterEvent("PARTY_MEMBER_ENABLE")
-    frame:RegisterEvent("UNIT_AURA")
-    frame:RegisterEvent("UNIT_LEVEL")
     frame:RegisterEvent("READY_CHECK")
     frame:RegisterEvent("READY_CHECK_CONFIRM")
     frame:RegisterEvent("READY_CHECK_FINISHED")
 
-    frame:SetScript("OnEvent", party_OnEvent)
+    frame:RegisterUnitEvent("UNIT_AURA", registerUnit)
+    frame:RegisterUnitEvent("UNIT_LEVEL", registerUnit)
+    frame:RegisterUnitEvent("UNIT_PHASE", registerUnit)
+    frame:RegisterUnitEvent("UNIT_HEALTH", registerUnit)
+    frame:RegisterUnitEvent("UNIT_HEALTH_FREQUENT", registerUnit)
+    frame:RegisterUnitEvent("UNIT_MAXHEALTH", registerUnit)
+    frame:RegisterUnitEvent("UNIT_ABSORB_AMOUNT_CHANGED", registerUnit)
+    frame:RegisterUnitEvent("UNIT_POWER_FREQUENT", registerUnit)
+    frame:RegisterUnitEvent("UNIT_MAXPOWER", registerUnit)
+    frame:RegisterUnitEvent("UNIT_NAME_UPDATE", registerUnit)
 
     updatePartyData(frame)
 end

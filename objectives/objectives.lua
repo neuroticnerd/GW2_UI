@@ -18,6 +18,7 @@ TRACKER_TYPE_COLOR["EVENT"] = {r = 240 / 255, g = 121 / 255, b = 37 / 255}
 TRACKER_TYPE_COLOR["BONUS"] = {r = 240 / 255, g = 121 / 255, b = 37 / 255}
 TRACKER_TYPE_COLOR["SCENARIO"] = {r = 171 / 255, g = 37 / 255, b = 240 / 255}
 TRACKER_TYPE_COLOR["BOSS"] = {r = 240 / 255, g = 37 / 255, b = 37 / 255}
+TRACKER_TYPE_COLOR["ARENA"] = {r = 240 / 255, g = 37 / 255, b = 37 / 255}
 TRACKER_TYPE_COLOR["ACHIEVEMENT"] = {r = 37 / 255, g = 240 / 255, b = 172 / 255}
 
 local function wiggleAnim(self)
@@ -95,26 +96,36 @@ local function loadQuestButtons()
         actionButton.icon:SetTexCoord(0.1, 0.9, 0.1, 0.9)
         actionButton.NormalTexture:SetTexture(nil)
         actionButton:RegisterForClicks("AnyUp")
-        actionButton:SetScript("OnShow", QuestObjectiveItem_OnHide)
+        actionButton:SetScript("OnShow", QuestObjectiveItem_OnShow)
         actionButton:SetScript("OnHide", QuestObjectiveItem_OnHide)
         actionButton:SetScript("OnEnter", QuestObjectiveItem_OnEnter)
+        actionButton:SetScript("OnLeave", GameTooltip_Hide)
+        actionButton:SetScript("OnEvent", QuestObjectiveItem_OnEvent)
+        actionButton:SetScript("OnUpdate", QuestObjectiveItem_OnUpdate)
+        
     end
 
     actionButton = CreateFrame("Button", "GwBonusItemButton", GwQuestTracker, "GwQuestItemTemplate")
     actionButton.icon:SetTexCoord(0.1, 0.9, 0.1, 0.9)
     actionButton.NormalTexture:SetTexture(nil)
     actionButton:RegisterForClicks("AnyUp")
-    actionButton:SetScript("OnShow", QuestObjectiveItem_OnHide)
+    actionButton:SetScript("OnShow", QuestObjectiveItem_OnShow)
     actionButton:SetScript("OnHide", QuestObjectiveItem_OnHide)
     actionButton:SetScript("OnEnter", QuestObjectiveItem_OnEnter)
+    actionButton:SetScript("OnLeave", GameTooltip_Hide)
+    actionButton:SetScript("OnEvent", QuestObjectiveItem_OnEvent)
+    actionButton:SetScript("OnUpdate", QuestObjectiveItem_OnUpdate)
 
     actionButton = CreateFrame("Button", "GwScenarioItemButton", GwQuestTracker, "GwQuestItemTemplate")
     actionButton.icon:SetTexCoord(0.1, 0.9, 0.1, 0.9)
     actionButton.NormalTexture:SetTexture(nil)
     actionButton:RegisterForClicks("AnyUp")
-    actionButton:SetScript("OnShow", QuestObjectiveItem_OnHide)
+    actionButton:SetScript("OnShow", QuestObjectiveItem_OnShow)
     actionButton:SetScript("OnHide", QuestObjectiveItem_OnHide)
     actionButton:SetScript("OnEnter", QuestObjectiveItem_OnEnter)
+    actionButton:SetScript("OnLeave", GameTooltip_Hide)
+    actionButton:SetScript("OnEvent", QuestObjectiveItem_OnEvent)
+    actionButton:SetScript("OnUpdate", QuestObjectiveItem_OnUpdate)
 end
 GW.AddForProfiling("objectives", "loadQuestButtons", loadQuestButtons)
 
@@ -380,11 +391,28 @@ local function getBlock(blockIndex)
     setBlockColor(newBlock, "QUEST")
     newBlock.Header:SetTextColor(newBlock.color.r, newBlock.color.g, newBlock.color.b)
     newBlock.hover:SetVertexColor(newBlock.color.r, newBlock.color.g, newBlock.color.b)
+    newBlock.joingroup:SetHighlightTexture("Interface\\AddOns\\GW2_UI\\textures\\LFDMicroButton-Down")
+    newBlock.joingroup:SetScript(
+        "OnClick",
+        function (self)
+            local p = self:GetParent()
+            LFGListUtil_FindQuestGroup(p.questID)
+        end
+    )
+    newBlock.joingroup:SetScript(
+        "OnEnter",
+        function (self)
+            GameTooltip:SetOwner(self)
+            GameTooltip:AddLine(TOOLTIP_TRACKER_FIND_GROUP_BUTTON, HIGHLIGHT_FONT_COLOR:GetRGB())
+            GameTooltip:Show()
+        end
+    )
+    newBlock.joingroup:SetScript("OnLeave", GameTooltip_Hide)
     return newBlock
 end
 GW.AddForProfiling("objectives", "getBlock", getBlock)
 
-local function addObjective(block, text, finished, objectiveIndex)
+local function addObjective(block, text, finished, objectiveIndex, objectiveType)
     if finished == true then
         return
     end
@@ -404,13 +432,18 @@ local function addObjective(block, text, finished, objectiveIndex)
                 objectiveBlock.StatusBar:Show()
                 objectiveBlock.StatusBar:SetMinMaxValues(0, 100)
                 objectiveBlock.StatusBar:SetValue(GetQuestProgressBarPercent(block.questID))
+                objectiveBlock.progress = GetQuestProgressBarPercent(block.questID) / 100
             end
         else
             objectiveBlock.StatusBar:Hide()
         end
         local h = 20
         if objectiveBlock.StatusBar:IsShown() then
-            h = 50
+            if block.numObjectives >= 1 then
+                h = 50
+            else
+                h = 40
+            end
         end
         block.height = block.height + h
         block.numObjectives = block.numObjectives + 1
@@ -421,9 +454,10 @@ GW.AddForProfiling("objectives", "addObjective", addObjective)
 local function updateQuestObjective(block, numObjectives, isComplete, title)
     local addedObjectives = 1
     for objectiveIndex = 1, numObjectives do
-        local text, _, finished = GetQuestLogLeaderBoard(objectiveIndex, block.questLogIndex)
+        --local text, _, finished = GetQuestLogLeaderBoard(objectiveIndex, block.questLogIndex)
+        local text, objectiveType, finished = GetQuestObjectiveInfo(block.questID, objectiveIndex, false)
         if not finished then
-            addObjective(block, text, finished, addedObjectives)
+            addObjective(block, text, finished, addedObjectives, objectiveType)
             addedObjectives = addedObjectives + 1
         end
     end
@@ -449,7 +483,7 @@ local function UpdateQuestItem(button, questLogIndex)
     button:SetID(questLogIndex)
 
     button:SetAttribute("type", "item")
-    button:SetAttribute("item", GetItemInfo(link))
+    button:SetAttribute("item", link)
 
     button.charges = charges
     button.rangeTimer = -1
@@ -461,21 +495,30 @@ local function UpdateQuestItem(button, questLogIndex)
 end
 GW.UpdateQuestItem = UpdateQuestItem
 
-local function updatePOI(questID, questLogIndex)
-    PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+local function OnBlockClick(self, button)
+    if (ChatEdit_TryInsertQuestLinkForQuestID(self.questID)) then
+		return
+	end
 
-    if (IsQuestWatched(questLogIndex)) then
-        if (IsShiftKeyDown()) then
-            QuestObjectiveTracker_UntrackQuest(nil, questID)
-            return
-        end
-    else
-        AddQuestWatch(questLogIndex, true)
-    end
-    SetSuperTrackedQuestID(questID)
-    -- WorldMapFrame_OnUserChangedSuperTrackedQuest(questID)
+    if (button ~= "RightButton") then
+        PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+		if (IsModifiedClick("QUESTWATCHTOGGLE")) then
+			QuestObjectiveTracker_UntrackQuest(nil, self.questID)
+		else
+			QuestMapFrame_OpenToQuestDetails(self.questID)
+		end
+	end
 end
-GW.AddForProfiling("objectives", "updatePOI", updatePOI)
+GW.AddForProfiling("objectives", "OnBlockClick", OnBlockClick)
+
+local function OnBlockClickHandler(self, button)
+    if self.questID == nil then 
+        OnBlockClick(self:GetParent(), button)
+    else
+        OnBlockClick(self, button)
+    end
+end
+GW.AddForProfiling("objectives", "OnBlockClickHandler", OnBlockClickHandler)
 
 local function updateQuest(block, questWatchId)
     block.height = 25
@@ -514,13 +557,14 @@ local function updateQuest(block, questWatchId)
                 block,
                 GetMoneyString(GetMoney()) .. " / " .. GetMoneyString(requiredMoney),
                 finished,
-                block.numObjectives + 1
+                block.numObjectives + 1,
+                nil
             )
         end
 
         if isComplete then
             if isAutoComplete then
-                addObjective(block, QUEST_WATCH_CLICK_TO_COMPLETE, false, block.numObjectives + 1)
+                addObjective(block, QUEST_WATCH_CLICK_TO_COMPLETE, false, block.numObjectives + 1, nil)
                 block.turnin:Show()
                 block.turnin:SetScript(
                     "OnClick",
@@ -532,25 +576,20 @@ local function updateQuest(block, questWatchId)
                 local completionText = GetQuestLogCompletionText(questLogIndex)
 
                 if (completionText) then
-                    addObjective(block, completionText, false, block.numObjectives + 1)
+                    addObjective(block, completionText, false, block.numObjectives + 1, nil)
                 else
-                    addObjective(block, QUEST_WATCH_QUEST_READY, false, block.numObjectives + 1)
+                    addObjective(block, QUEST_WATCH_QUEST_READY, false, block.numObjectives + 1, nil)
                 end
             end
         end
-
-        block.clickHeader:SetScript(
-            "OnClick",
-            function()
-                updatePOI(questID, questLogIndex)
-            end
-        )
-        block:SetScript(
-            "OnClick",
-            function()
-                QuestLogPopupDetailFrame_Show(questLogIndex)
-            end
-        )
+        block.clickHeader:SetScript("OnClick", OnBlockClickHandler)
+        block:SetScript("OnClick", OnBlockClickHandler)
+        --add groupfinder button
+        if C_LFGList.CanCreateQuestGroup(block.questID) then
+            block.joingroup:Show()
+        else
+            block.joingroup:Hide()
+        end
     end
     if block.objectiveBlocks == nil then
         block.objectiveBlocks = {}
@@ -834,6 +873,9 @@ local function LoadQuestTracker()
     updateQuestLogLayout("LOAD")
 
     GW.LoadBossFrame()
+    if not IsAddOnLoaded("sArena") then
+        GW.LoadArenaFrame()
+    end
     GW.LoadScenarioFrame()
     GW.LoadAchievementFrame()
     GW.LoadBonusFrame()

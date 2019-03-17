@@ -45,6 +45,20 @@ local function moveBankBagBar()
         v:SetHighlightTexture(nil)
         v.IconBorder:SetTexture(nil)
 
+        local s = v:GetScript("OnClick")
+        v:SetScript(
+            "OnClick",
+            function(self, b)
+                if b == "RightButton" then
+                    local parent = _G[default_bank_frame_container[k]]
+                    PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+                    ToggleDropDownMenu(1, nil, parent.FilterDropDown, self, 32, 32)
+                else
+                    s(v)
+                end
+            end
+        )
+
         y = y + 32
     end
 end
@@ -120,7 +134,7 @@ GW.AddForProfiling("bank", "createItemBackground", createItemBackground)
 
 local function updateReagentsIcons(smooth)
     local x = 8
-    local y = 72
+    local y = 40
     local mx = 0
     local gwbf = GwBankFrame
     local winsize = BANK_WINDOW_SIZE
@@ -638,6 +652,14 @@ local function LoadBank()
             DepositReagentBank()
         end
     )
+    -- setup reagent bank stuff
+    GwBankDepositAllReagentsBank:SetText(REAGENTBANK_DEPOSIT)
+    GwBankDepositAllReagentsBank:HookScript(
+        "OnClick",
+        function(self)
+            DepositReagentBank()
+        end
+    )
 
     GwBuyRegentBank:HookScript(
         "OnClick",
@@ -653,7 +675,8 @@ local function LoadBank()
                 if IsReagentBankUnlocked() then
                     GwRegentHelpText:Hide()
                     GwBuyRegentBank:Hide()
-                    GwBankDepositAllReagents:Show()
+                    GwBankDepositAllReagents:Hide()
+                    GwBankDepositAllReagentsBank:Show()
                 end
             end
         end
@@ -661,12 +684,16 @@ local function LoadBank()
     GwReagentBankFrame:RegisterEvent("REAGENTBANK_PURCHASED")
     GwRegentHelpText:SetFont(UNIT_NAME_FONT, 12)
     GwRegentHelpText:SetShadowColor(1, 1, 1)
-    BUY_REGENTBAG_TEXT = PURCHASE .. " " .. ((GetReagentBankCost()) / 100 / 100) .. "G"
-    GwBuyRegentBank:SetText(BUY_REGENTBAG_TEXT)
+    BUY_REAGENTBANK_TEXT = PURCHASE .. " " .. ((GetReagentBankCost()) / 100 / 100) .. "G"
+    GwBuyRegentBank:SetText(BUY_REAGENTBANK_TEXT)
     if IsReagentBankUnlocked() then
         GwRegentHelpText:Hide()
         GwBuyRegentBank:Hide()
-        GwBankDepositAllReagents:Show()
+        GwBankDepositAllReagentsBank:Show()
+        if GetNumBankSlots() < 7 then
+            GwBankDepositAllReagentsBank:ClearAllPoints()
+            GwBankDepositAllReagentsBank:SetPoint("TOPRIGHT", GwBankFrame, "BOTTOMRIGHT", -5, -5)
+        end
     end
 
     ReagentBankFrame:HookScript(
@@ -688,10 +715,12 @@ local function LoadBank()
 
             if IsReagentBankUnlocked() then
                 updateReagentsIcons()
-
                 GwRegentHelpText:Hide()
                 GwBuyRegentBank:Hide()
+                GwBankDepositAllReagentsBank:Hide()
                 GwBankDepositAllReagents:Show()
+                GwBankDepositAllReagents:ClearAllPoints()
+                GwBankDepositAllReagents:SetPoint("TOPLEFT", GwBankFrame, "BOTTOMLEFT", 5, -5)
             end
         end
     )
@@ -704,11 +733,17 @@ local function LoadBank()
             GwBankFrame.headerString:SetText(BANK)
             BankItemSearchBox:Show()
             GwReagentBankFrame:Hide()
+            GwBankDepositAllReagents:Hide()
+            GwBankDepositAllReagentsBank:Show()
             for i = 5, 12 do
                 OpenBag(i)
             end
             if GetNumBankSlots() < 7 then
                 GwBuyMoreBank:Show()
+            end
+            if IsReagentBankUnlocked() and GetNumBankSlots() < 7 then
+                GwBankDepositAllReagents:ClearAllPoints()
+                GwBankDepositAllReagents:SetPoint("TOPRIGHT", GwBankFrame, "BOTTOMRIGHT", -5, -5)
             end
         end
     )
@@ -770,7 +805,9 @@ local function LoadBank()
                 "OnHide",
                 function()
                     CloseBags()
-                    updateBankIcons()
+                    if not ReagentBankFrame:IsShown() then
+                        updateBankIcons()
+                    end
                     if fc then
                         fc:Hide()
                     end
@@ -791,6 +828,9 @@ local function LoadBank()
     BankItemSearchBox:SetScript(
         "OnEvent",
         function(self, event, ...)
+            if not GW.inWorld then
+                return
+            end
             if event == "BAG_UPDATE" or event == "BAG_UPDATE_DELAYED" then
                 relocateBankSearchBox()
                 if GwReagentBankFrame:IsShown() and IsReagentBankUnlocked() then

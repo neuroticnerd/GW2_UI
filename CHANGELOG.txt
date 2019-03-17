@@ -1,3 +1,152 @@
+5.0.20
+
+NEW
+    - Added warfront ressources
+
+
+5.0.19
+
+FIXES
+    - In-depth fix for the ItemButton API change
+
+5.0.18
+
+FIXES
+    - This is a bandaid fix for the ItemButton API change; for now items have unsightly ilvl
+      borders and the equipment selection tool doesn't show icons properly until a more
+      in-depth fix is available
+
+
+5.0.17
+
+NEW
+    - Added option to show healthvalues on raidframes
+    - Added itemlevel to Hero window
+
+FIXES
+    - Improved performance of displaying raid auras (~10x) to prevent stuttering in large raids
+    - Re-enabled updating raid frames when the party/raid changes during combat
+    - Party frames should display names properly
+
+
+5.0.16
+
+NEW
+    - Added option to show target average item level instead of prestige level
+    - Added "Edit" button to equipment sets to change name and icon
+    - Raid aura indicators now show stack count for auras with more than one stack
+    - Added Paragon pending reward icon
+
+FIXES
+    - Fixed text of equipment set save and delete dialog
+    - Fixed raid frame positioning problem happening since 8.1
+    - Fixed reagent bank sizing
+    - Fixed ready check for party frames
+    
+MISCELLANEOUS
+    - Changed shaman raid indicator colors to match the spell icon colors
+
+
+5.0.15
+
+MISCELLANEOUS
+    - Update TOC version to 8.1
+
+5.0.14
+
+FIXED
+    - Fix an error with the custom UI in Arathi Basin BG (and Brawl version)
+    - Jaina is now visible when using the immersive quest view in War Campaign quests
+
+
+5.0.13
+
+NEW
+    - Add background imagery to reputation entries (BC, Classic, Others)
+
+FIXED
+    - Added middle mouse button to party and raidframes
+    - Fix a bug that the raidframe target border stuck
+
+
+5.0.12 - We would like to welcome Shrugal to the development team!
+
+NEW
+    - Option to sort raid frames by group instead of role
+    - Additional options for raid layout and sizing
+    - Option to preview raid frames for different group sizes
+    - Support for hiding auras and showing missing buffs in raid frames
+    - Configurable class buff indicators in raid frames
+    - Add link to MyRolePlay in hero panel that temporarily uses default character frame (CF#264)
+
+FIXED
+    - Castbar gets stuck on screen (CF#263)
+    - Fix some issues with the new Arena frames incl CF#261
+    - Fix Lua error at fraction window
+
+
+5.0.11
+
+FIXED
+    - Fix a major issue in minimap icon handling (CF#254/CF#258)
+    - Quests with progress bars and items should now show correctly in the tracker
+    - Reputation search bug squashed
+
+NEW
+    - Arena frames added to the objectives tracker
+
+
+5.0.10
+
+NEW
+    - Add frenzy counter for Beast Mastery Hunter's class power
+    - Protection Paladins and Warriors now have a damage reduction class power bar
+    - Add power bar to boss frames (CF#240)
+    - Add a new LFG icon animation
+    - Add a new health globe animation
+    - M+ tracker updates: added two and three chest indicator and death counter
+    - Add background imagery to reputation entries (MoP, WoD, Cata, TLK)
+    - Add LFG button to Quests and World Quests (CF#125)
+
+FIXED
+    - Druid class power bars should behave more cleanly, especially when shape shifting and with affinities
+    - Fix a raid frame target border issue
+    - Fix the dodge/dash bar "antennas" (CF#241)
+    - Added logic to hopefully fix the loading screen crashing bug (CF#254)
+    - More fixes to vehicle UI behaviors (CF#251, CF#253, possibly CF#244)
+    - Pet portaits should now update correctly when swapping pets
+    - Resolove some map errors that could occur on initial transition into Arathi Basin BG
+    - Fix dodge/dash bar showing incorrect charge counts in some cases
+
+MISCELLANEOUS
+    - Major refactor of the class power system mainly for performance reasons
+    - Performance fixes in all unit frame event handling
+
+
+5.0.9
+
+NEW
+    - Add background imagery to reputation entries (for the beginning: BfA and Legion; credit v_riz_table_Kao)
+    - Mythic keystone level now visible in the objectives tracker (CF#234)
+    - Add link to Outfitter in hero panel that temporarily uses default character frame (CF#219)
+    - Add link to Clique options that lets Clique use default spell panel for spell binding
+    - Raid frames now have incoming heal prediction
+    - Add Leader, Assist, Mainassist and Maintank icon to raid frames
+
+FIXED
+    - Group frames can now be moved properly to the right of the screen (CF#194)
+    - Font sizing issues in chat have been fixed (CF#231, CF#232)
+    - Fix a scrolling issue and click-to-expand when searching issue in reputation list
+    - Hide health globe in pet battles when using custom action bars (CF#235)
+    - High level M+ keys now properly show 4th affix
+    - Fix some Minmap Button collecting issues (CF#212; credit Munsio)
+    - Display passive talents in spellbook
+
+MISCELLANEOUS
+    - The minimap clock options have been updated to include time manager (credit Munsio)
+    - Add "Deposit all"-Button to bank view (credit Munsio)
+
+
 5.0.8
 
 NEW

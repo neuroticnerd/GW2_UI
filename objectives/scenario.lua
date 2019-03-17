@@ -8,6 +8,9 @@ local CreateObjectiveNormal = GW.CreateObjectiveNormal
 local CreateTrackerObject = GW.CreateTrackerObject
 local UpdateQuestItem = GW.UpdateQuestItem
 
+local TIME_FOR_3 = 0.6
+local TIME_FOR_2 = 0.8
+
 local function getObjectiveBlock(self, index)
     if _G[self:GetName() .. "GwQuestObjective" .. index] ~= nil then
         return _G[self:GetName() .. "GwQuestObjective" .. index]
@@ -106,7 +109,9 @@ local function updateCurrentScenario()
     GwScenarioBlock.numObjectives = 0
     GwScenarioBlock:Show()
 
-    local _, _, numStages, _ = C_Scenario.GetInfo()
+    local _, _, numStages, _, _, _, _, _, _, scenarioType = C_Scenario.GetInfo()
+    local inWarfront = (scenarioType == LE_SCENARIO_TYPE_WARFRONT)
+
     if (numStages == 0) then
         local name, instanceType, _, difficultyName, _ = GetInstanceInfo()
         if instanceType == "raid" then
@@ -141,7 +146,12 @@ local function updateCurrentScenario()
         stageName = ""
     end
     if difficultyName ~= nil then
-        compassData["TITLE"] = stageName .. " |cFFFFFFFF " .. difficultyName .. "|r"
+        local level, _, _ = C_ChallengeMode.GetActiveKeystoneInfo()
+        if level > 0 then
+            compassData["TITLE"] = stageName .. " |cFFFFFFFF +" .. level .. " " .. difficultyName .. "|r"
+        else
+            compassData["TITLE"] = stageName .. " |cFFFFFFFF " .. difficultyName .. "|r"
+        end
         compassData["DESC"] = stageDescription .. " "
         GW.AddTrackerNotification(compassData)
     end
@@ -177,6 +187,29 @@ local function updateCurrentScenario()
             criteriaIndex,
             objectiveType,
             quantity
+        )
+    end
+
+    if inWarfront then 
+        local wname, wqty, _, _, _, wmax = GetCurrencyInfo(1540)  --Wood
+        local iname, iqty, _, _, _, imax = GetCurrencyInfo(1541)  --Iron
+        --Wood
+        addObjectiveBlock(
+            GwScenarioBlock,
+            ParseCriteria(wqty, wmax, wname),
+            false,
+            numCriteria + 1,
+            "progressbar",
+            wqty
+        )
+        --Iron
+        addObjectiveBlock(
+            GwScenarioBlock,
+            ParseCriteria(iqty, imax, iname),
+            false,
+            numCriteria + 2,
+            "progressbar",
+            iqty / imax * 100
         )
     end
 
@@ -244,6 +277,10 @@ GW.AddForProfiling("scenario", "updateCurrentScenario", updateCurrentScenario)
 local function scenarioTimerStop()
     GwQuestTrackerTimer:SetScript("OnUpdate", nil)
     GwQuestTrackerTimer.timer:Hide()
+    GwQuestTrackerTimer.timerStringChest2:Hide()
+    GwQuestTrackerTimer.timerStringChest3:Hide()
+    GwQuestTrackerTimer.chestoverlay:Hide()
+    GwQuestTrackerTimer.deathcounter:Hide()
 end
 GW.AddForProfiling("scenario", "scenarioTimerStop", scenarioTimerStop)
 
@@ -272,7 +309,7 @@ local function scenarioAffixes()
     if i == 1 then
         GwQuestTrackerTimer.timer:ClearAllPoints()
         GwQuestTrackerTimer.timer:SetPoint("TOPRIGHT", GwQuestTrackerTimer.affixes, "BOTTOMRIGHT", -10, 20)
-        for k = 1, 3 do
+        for k = 1, 4 do
             _G["GwAffixFrame" .. k].affixID = nil
             _G["GwAffixFrame" .. k .. "Icon"]:SetTexture("Interface\\AddOns\\GW2_UI\\textures\\icon-boss")
         end
@@ -280,6 +317,19 @@ local function scenarioAffixes()
     end
 end
 GW.AddForProfiling("scenario", "scenarioAffixes", scenarioAffixes)
+
+local function scenarioTimerUpdateDeathCounter(self)
+    local count, timeLost = C_ChallengeMode.GetDeathCount()
+	self.deathcounter.count = count
+	self.deathcounter.timeLost = timeLost
+	if (timeLost and timeLost > 0 and count and count > 0) then
+        self.deathcounter.counterlabel:SetText(count)
+        self.deathcounter:Show() 
+	else
+		self.deathcounter:Hide()
+	end
+end
+GW.AddForProfiling("scenario", "scenarioTimerUpdateDeathCounter", scenarioTimerUpdateDeathCounter)
 
 local function scenarioTimerUpdate(...)
     GwQuestTrackerTimer.height = 1
@@ -293,18 +343,48 @@ local function scenarioTimerUpdate(...)
             local mapID = C_ChallengeMode.GetActiveChallengeMapID()
             if (mapID) then
                 local _, _, timeLimit = C_ChallengeMode.GetMapUIInfo(mapID)
+                local time3 = timeLimit * TIME_FOR_3
+	            local time2 = timeLimit * TIME_FOR_2
                 --	Scenario_ChallengeMode_ShowBlock(timerID, elapsedTime, timeLimit);
+                --set Chest icon
+                GwQuestTrackerTimer.chestoverlay:Show()
+                GwQuestTrackerTimer.chestoverlay.chest2:ClearAllPoints()
+                GwQuestTrackerTimer.chestoverlay.chest2:SetPoint("LEFT", GwQuestTrackerTimer.timer, "LEFT", GwQuestTrackerTimer.timer:GetWidth() * (1 - TIME_FOR_2) - 1, -6)
+                GwQuestTrackerTimer.chestoverlay.chest3:ClearAllPoints()
+                GwQuestTrackerTimer.chestoverlay.chest3:SetPoint("LEFT", GwQuestTrackerTimer.timer, "LEFT", GwQuestTrackerTimer.timer:GetWidth() * (1 - TIME_FOR_3) - 1, -6)
                 GwQuestTrackerTimer:SetScript(
                     "OnUpdate",
                     function()
                         local _, elapsedTime, _ = GetWorldElapsedTime(timerID)
                         GwQuestTrackerTimer.timer:SetValue(1 - (elapsedTime / timeLimit))
-                        GwQuestTrackerTimer.timerString:SetText(GetTimeStringFromSeconds(timeLimit - elapsedTime))
+                        GwQuestTrackerTimer.chestoverlay.chest2:SetShown(elapsedTime < time2)
+                        GwQuestTrackerTimer.chestoverlay.chest3:SetShown(elapsedTime < time3)
+                        if elapsedTime < timeLimit then
+                            GwQuestTrackerTimer.timerString:SetText(GetTimeStringFromSeconds(timeLimit - elapsedTime, false, true))
+                            GwQuestTrackerTimer.timerString:SetTextColor(1, 1, 1)
+                        else
+                            GwQuestTrackerTimer.timerString:SetText(GetTimeStringFromSeconds(0, false, true))
+                            GwQuestTrackerTimer.timerString:SetTextColor(255, 0, 0)
+                        end
+                        if elapsedTime < time3 then
+                            GwQuestTrackerTimer.timerStringChest3:SetText(GetTimeStringFromSeconds(time3 - elapsedTime, false, true))
+                            GwQuestTrackerTimer.timerStringChest2:SetText(GetTimeStringFromSeconds(time2 - elapsedTime, false, true))
+                            GwQuestTrackerTimer.timerStringChest3:Show()
+                            GwQuestTrackerTimer.timerStringChest2:Show()
+                        elseif elapsedTime < time2 then
+                            GwQuestTrackerTimer.timerStringChest2:SetText(GetTimeStringFromSeconds(time2 - elapsedTime, false, true))
+                            GwQuestTrackerTimer.timerStringChest2:Show()
+                            GwQuestTrackerTimer.timerStringChest3:Hide()
+                        else
+                            GwQuestTrackerTimer.timerStringChest2:Hide()
+                            GwQuestTrackerTimer.timerStringChest3:Hide()
+                        end
                     end
                 )
                 GwQuestTrackerTimer.timer:Show()
-                GwQuestTrackerTimer.height = GwQuestTrackerTimer.height + 40
+                GwQuestTrackerTimer.height = GwQuestTrackerTimer.height + 50
                 scenarioAffixes()
+                scenarioTimerUpdateDeathCounter(GwQuestTrackerTimer)
                 return
             end
         elseif (wtype == LE_WORLD_ELAPSED_TIMER_TYPE_PROVING_GROUND) then
@@ -328,10 +408,14 @@ local function scenarioTimerUpdate(...)
         end
     end
     GwQuestTrackerTimer.timer:Hide()
+    GwQuestTrackerTimer.timerStringChest2:Hide()
+    GwQuestTrackerTimer.timerStringChest3:Hide()
+    GwQuestTrackerTimer.chestoverlay:Hide()
+    GwQuestTrackerTimer.deathcounter:Hide()
     GwQuestTrackerTimer:SetScript("OnUpdate", nil)
 
     if hasUpdatedAffixes == false then
-        for i = 1, 3 do
+        for i = 1, 4 do
             _G["GwAffixFrame" .. i].affixID = nil
             _G["GwAffixFrame" .. i .. "Icon"]:SetTexture("Interface\\AddOns\\GW2_UI\\textures\\icon-boss")
         end
@@ -344,6 +428,7 @@ local function scenarioTimerOnEvent(self, event, ...)
     if (event == "PLAYER_ENTERING_WORLD" or event == nil) then
         -- ScenarioTimer_CheckTimers(GetWorldElapsedTimers());
         scenarioTimerUpdate(GetWorldElapsedTimers())
+        scenarioTimerUpdateDeathCounter(GwQuestTrackerTimer)
     elseif (event == "WORLD_STATE_TIMER_START") then
         local timerID = ...
         scenarioTimerUpdate(timerID)
@@ -361,6 +446,8 @@ local function scenarioTimerOnEvent(self, event, ...)
             event == "ZONE_CHANGED")
      then
         scenarioTimerUpdate(GetWorldElapsedTimers())
+    elseif event == "CHALLENGE_MODE_DEATH_COUNT_UPDATED" then
+        scenarioTimerUpdateDeathCounter(GwQuestTrackerTimer)
     end
     GwQuestTrackerTimer:SetHeight(GwQuestTrackerTimer.height)
 
@@ -373,6 +460,8 @@ local function LoadScenarioFrame()
 
     GwQuesttrackerContainerScenario:RegisterEvent("SCENARIO_UPDATE")
     GwQuesttrackerContainerScenario:RegisterEvent("SCENARIO_CRITERIA_UPDATE")
+    GwQuesttrackerContainerScenario:RegisterEvent("LOOT_CLOSED")
+    GwQuesttrackerContainerScenario:RegisterEvent("CURRENCY_DISPLAY_UPDATE")
 
     GwQuesttrackerContainerScenario:RegisterEvent("ZONE_CHANGED_INDOORS")
     GwQuesttrackerContainerScenario:RegisterEvent("ZONE_CHANGED_NEW_AREA")
@@ -385,13 +474,31 @@ local function LoadScenarioFrame()
     timerBlock.height = timerBlock:GetHeight()
     timerBlock.timerlabel = timerBlock.timer.timerlabel
     timerBlock.timerString = timerBlock.timer.timerString
+    timerBlock.timerStringChest2 = timerBlock.timer.timerStringChest2
+    timerBlock.timerStringChest3 = timerBlock.timer.timerStringChest3
     timerBlock.timerBackground:ClearAllPoints()
     timerBlock.timerBackground:SetPoint("CENTER", timerBlock.timer, "CENTER")
     timerBlock.timerlabel:SetFont(UNIT_NAME_FONT, 12)
     timerBlock.timerlabel:SetTextColor(1, 1, 1)
+    timerBlock.timerlabel:SetShadowOffset(1, -1)
     timerBlock.timerString:SetFont(UNIT_NAME_FONT, 12)
     timerBlock.timerString:SetTextColor(1, 1, 1)
     timerBlock.timerString:SetShadowOffset(1, -1)
+    timerBlock.timerStringChest2:SetFont(UNIT_NAME_FONT, 10)
+    timerBlock.timerStringChest2:SetTextColor(1, 1, 1)
+    timerBlock.timerStringChest2:SetShadowOffset(1, -1)
+    timerBlock.timerStringChest2:ClearAllPoints()
+    timerBlock.timerStringChest2:SetPoint("RIGHT", timerBlock.chestoverlay.chest2, "LEFT", -2, -6)
+    timerBlock.timerStringChest3:SetFont(UNIT_NAME_FONT, 10)
+    timerBlock.timerStringChest3:SetTextColor(1, 1, 1)
+    timerBlock.timerStringChest3:SetShadowOffset(1, -1)
+    timerBlock.timerStringChest3:ClearAllPoints()
+    timerBlock.timerStringChest3:SetPoint("RIGHT", timerBlock.chestoverlay.chest3, "LEFT", -2, -6)
+    timerBlock.deathcounter:ClearAllPoints()
+    timerBlock.deathcounter:SetPoint("LEFT", timerBlock.timer, "RIGHT", -35, -14)
+    timerBlock.deathcounter.counterlabel:SetFont(UNIT_NAME_FONT, 10)
+    timerBlock.deathcounter.counterlabel:SetTextColor(1, 1, 1)
+    timerBlock.deathcounter.counterlabel:SetShadowOffset(1, -1)
     timerBlock.score:ClearAllPoints()
     timerBlock.score:SetPoint("TOPLEFT", timerBlock.timer, "BOTTOMLEFT", 0, 0)
     timerBlock.score.scoreString:SetFont(UNIT_NAME_FONT, 12)
@@ -455,6 +562,31 @@ local function LoadScenarioFrame()
         end
     )
     timerBlock.affixes["3"]:SetScript("OnLeave", GameTooltip_Hide)
+    timerBlock.affixes["4"]:SetScript(
+        "OnEnter",
+        function(self)
+            if self.affixID ~= nil then
+                GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT", 0, 50)
+                GameTooltip:ClearLines()
+                local name, description = C_ChallengeMode.GetAffixInfo(self.affixID)
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:SetText(name, 1, 1, 1, 1, true)
+                GameTooltip:AddLine(description, nil, nil, nil, true)
+                GameTooltip:Show()
+            end
+        end
+    )
+    timerBlock.affixes["4"]:SetScript("OnLeave", GameTooltip_Hide)
+    timerBlock.deathcounter:SetScript(
+        "OnEnter",
+        function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+	        GameTooltip:SetText(CHALLENGE_MODE_DEATH_COUNT_TITLE:format(self.count), 1, 1, 1)
+	        GameTooltip:AddLine(CHALLENGE_MODE_DEATH_COUNT_DESCRIPTION:format(GetTimeStringFromSeconds(self.timeLost, false, true)))
+	        GameTooltip:Show()
+        end
+    )
+    timerBlock.deathcounter:SetScript("OnLeave", GameTooltip_Hide)
 
     timerBlock:SetParent(GwQuesttrackerContainerScenario)
     timerBlock:ClearAllPoints()
@@ -464,11 +596,12 @@ local function LoadScenarioFrame()
     timerBlock:RegisterEvent("WORLD_STATE_TIMER_START")
     timerBlock:RegisterEvent("WORLD_STATE_TIMER_STOP")
     timerBlock:RegisterEvent("PROVING_GROUNDS_SCORE_UPDATE")
-    timerBlock:RegisterEvent("SPELL_UPDATE_COOLDOWN")
+    --timerBlock:RegisterEvent("SPELL_UPDATE_COOLDOWN")
     timerBlock:RegisterEvent("CHALLENGE_MODE_MAPS_UPDATE")
     timerBlock:RegisterEvent("CHALLENGE_MODE_START")
     timerBlock:RegisterEvent("CHALLENGE_MODE_COMPLETED")
     timerBlock:RegisterEvent("ZONE_CHANGED")
+    timerBlock:RegisterEvent("CHALLENGE_MODE_DEATH_COUNT_UPDATED")
 
     timerBlock:SetScript("OnEvent", scenarioTimerOnEvent)
 
