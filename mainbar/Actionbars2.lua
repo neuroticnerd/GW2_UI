@@ -7,7 +7,7 @@ local IsFrameModified = GW.IsFrameModified
 local CountTable = GW.CountTable
 local AddUpdateCB = GW.AddUpdateCB
 
-local MAIN_MENU_BAR_BUTTON_SIZE = 48
+local MAIN_MENU_BAR_BUTTON_SIZE = 46
 local MAIN_MENU_BAR_BUTTON_MARGIN = 5
 
 local GW_BLIZZARD_HIDE_FRAMES = {
@@ -624,6 +624,10 @@ local function updateMultiBar(barName, buttonName, actionPage, state)
                 if _G[borname] then
                     _G[borname]:SetVertexColor(0, 1.0, 0, 1)
                 end
+            end
+
+            if i == 6 and barName == "MultiBarBottomLeft" then
+                btn_padding = btn_padding + 121
             end
         end
     end
