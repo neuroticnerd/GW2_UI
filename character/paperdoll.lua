@@ -1,18 +1,23 @@
 local _, GW = ...
 local CharacterMenuButton_OnLoad = GW.CharacterMenuButton_OnLoad
 local CharacterMenuButtonBack_OnLoad = GW.CharacterMenuButtonBack_OnLoad
-local Debug = GW.Debug
 
 --local CHARACTER_PANEL_OPEN
 
 local fmMenu
 local hideCharframe = true
+local prevAddonButtonAnchor = nil
+local firstAddonMenuButtonAnchor
 
 local function characterPanelToggle(frame)
+    if InCombatLockdown() then
+        GW.Notice(ERR_NOT_IN_COMBAT)
+        return
+    end
     fmMenu:Hide()
     GwPaperDollBagItemList:Hide()
     GwPaperDollOutfits:Hide()
-    GwPaperTitles:Hide()
+    GwTitleWindow:Hide()
 
     if frame == nil then
         GwDressingRoom:Hide()
@@ -50,49 +55,48 @@ local function toggleCharacter(tab, onlyShow)
 end
 GW.AddForProfiling("paperdoll", "toggleCharacter", toggleCharacter)
 
-local function back_OnClick(self, button)
+local function back_OnClick()
     characterPanelToggle(fmMenu)
 end
 GW.AddForProfiling("paperdoll", "back_OnClick", back_OnClick)
 
-local function menuItem_OnClick(self, button)
+local function menuItem_OnClick(self)
     characterPanelToggle(self.ToggleMe)
 end
 GW.AddForProfiling("paperdoll", "menuItem_OnClick", menuItem_OnClick)
 
-local function menu_SetupBackButton(self, fmBtn, key)
+local function menu_SetupBackButton(_, fmBtn, key)
     fmBtn:SetText(key)
     CharacterMenuButtonBack_OnLoad(fmBtn)
     fmBtn:SetScript("OnClick", back_OnClick)
 end
 GW.AddForProfiling("paperdoll", "menu_SetupBackButton", menu_SetupBackButton)
 
-local nextShadow, nextAnchor
-local function addAddonButton(name, setting, buttonName, shadow, anchor, showFunction)
-    if IsAddOnLoaded(name) and (setting == nil or setting == true) then
-        fmMenu.buttonName = CreateFrame("Button", nil, fmMenu, "SecureHandlerClickTemplate,GwCharacterMenuButtonTemplate")
-        fmMenu.buttonName:SetText(name)
-        fmMenu.buttonName:ClearAllPoints()
-        fmMenu.buttonName:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT")
-        CharacterMenuButton_OnLoad(fmMenu.buttonName, shadow)
-        fmMenu.buttonName:SetFrameRef("charwin", GwCharacterWindow)
-        fmMenu.buttonName.ui_show = showFunction
-        fmMenu.buttonName:SetAttribute("_onclick", [=[
+local isFirstAddonButton = true
+local function addAddonButton(name, setting, showFunction)
+    if C_AddOns.IsAddOnLoaded(name) and (setting == nil or setting == true) then
+        fmMenu[name] = CreateFrame("Button", nil, fmMenu, "SecureHandlerClickTemplate,GwCharacterMenuButtonTemplate")
+        fmMenu[name]:SetText(select(2, C_AddOns.GetAddOnInfo(name)))
+        fmMenu[name]:ClearAllPoints()
+        fmMenu[name]:SetPoint("TOPLEFT", isFirstAddonButton and firstAddonMenuButtonAnchor or prevAddonButtonAnchor, "BOTTOMLEFT")
+        CharacterMenuButton_OnLoad(fmMenu[name])
+        fmMenu[name]:SetFrameRef("charwin", GwCharacterWindow)
+        fmMenu[name].ui_show = showFunction
+        fmMenu[name]:SetAttribute("_onclick", [=[
             local fchar = self:GetFrameRef("charwin")
             if fchar then
                 fchar:SetAttribute("windowpanelopen", nil)
             end
             self:CallMethod("ui_show")
         ]=])
-        nextShadow = not nextShadow
-        nextAnchor = fmMenu.buttonName
+        prevAddonButtonAnchor = fmMenu[name]
+        isFirstAddonButton = false
     end
 end
 
 local function LoadPaperDoll(tabContainer)
     --local fmPD = CreateFrame("Frame", "GwPaperDoll", tabContainer, "GwPaperDoll")
     GwPaperDoll = tabContainer
-    local fmDoll = tabContainer
 
     fmMenu = CreateFrame("Frame", nil, tabContainer, "GwCharacterMenu")
     fmMenu.SetupBackButton = menu_SetupBackButton
@@ -116,24 +120,36 @@ local function LoadPaperDoll(tabContainer)
     fmMenu.outfitsMenu:SetPoint("TOPLEFT", fmMenu.equipmentMenu, "BOTTOMLEFT")
 
     fmMenu.titlesMenu = CreateFrame("Button", nil, fmMenu, "GwCharacterMenuButtonTemplate")
-    fmMenu.titlesMenu.ToggleMe = GwPaperTitles
+    fmMenu.titlesMenu.ToggleMe = GwTitleWindow
     fmMenu.titlesMenu:SetScript("OnClick", menuItem_OnClick)
     fmMenu.titlesMenu:SetText(PAPERDOLL_SIDEBAR_TITLES)
     fmMenu.titlesMenu:ClearAllPoints()
     fmMenu.titlesMenu:SetPoint("TOPLEFT", fmMenu.outfitsMenu, "BOTTOMLEFT")
 
-    CharacterMenuButton_OnLoad(fmMenu.equipmentMenu, false)
-    CharacterMenuButton_OnLoad(fmMenu.outfitsMenu, true)
-    CharacterMenuButton_OnLoad(fmMenu.titlesMenu, false)
+    CharacterMenuButton_OnLoad(fmMenu.equipmentMenu, GW.nextHeroPanelMenuButtonShadowOdd)
+    CharacterMenuButton_OnLoad(fmMenu.outfitsMenu, GW.nextHeroPanelMenuButtonShadowOdd)
+    CharacterMenuButton_OnLoad(fmMenu.titlesMenu, GW.nextHeroPanelMenuButtonShadowOdd)
+
+    -- pull corruption thingy from default paperdoll
+    if (CharacterStatsPane and CharacterStatsPane.ItemLevelFrame) then
+        local cpt = CharacterStatsPane.ItemLevelFrame.Corruption
+        local attr = GwDressingRoom.stats
+        if (cpt and attr) then
+            cpt:SetParent(attr)
+            cpt:ClearAllPoints()
+            cpt:SetPoint("TOPRIGHT", attr, "TOPRIGHT", 22, 28)
+        end
+    end
 
     --AddOn Support
-    nextShadow = true
-    nextAnchor = fmMenu.titlesMenu
-    addAddonButton("Pawn", nil, PawnButton, nextShadow, nextAnchor, PawnUIShow)
-    addAddonButton("Clique", GW.GetSetting("USE_TALENT_WINDOW"), CliqueButton, nextShadow, nextAnchor, function() ShowUIPanel(CliqueConfig) end)
-    addAddonButton("Outfitter", GW.GetSetting("USE_CHARACTER_WINDOW"), OutfitterButton, nextShadow, nextAnchor, function() hideCharframe = false Outfitter:OpenUI() end)
-    addAddonButton("MyRolePlay", GW.GetSetting("USE_CHARACTER_WINDOW"), MyRolePlayButton, nextShadow, nextAnchor, function() hideCharframe = false ToggleCharacter("MyRolePlayCharacterFrame") end)
+    firstAddonMenuButtonAnchor = fmMenu.titlesMenu
+    addAddonButton("Pawn", nil, PawnUIShow)
+    addAddonButton("Clique", nil, function() ShowUIPanel(CliqueConfig) end)
+    addAddonButton("Outfitter", GW.settings.USE_CHARACTER_WINDOW, function() hideCharframe = false Outfitter:OpenUI() end)
+    addAddonButton("MyRolePlay", GW.settings.USE_CHARACTER_WINDOW, function() hideCharframe = false ToggleCharacter("MyRolePlayCharacterFrame") end)
+    addAddonButton("TalentSetManager", GW.settings.USE_TALENT_WINDOW, function() TalentFrame_LoadUI() if PlayerTalentFrame_Toggle then PlayerTalentFrame_Toggle(TALENTS_TAB) end end)
 
+    GW.ToggleCharacterItemInfo(true)
     CharacterFrame:SetScript(
         "OnShow",
         function()
@@ -147,5 +163,13 @@ local function LoadPaperDoll(tabContainer)
     CharacterFrame:UnregisterAllEvents()
 
     hooksecurefunc("ToggleCharacter", toggleCharacter)
+    hooksecurefunc("PaperDollFrame_UpdateCorruptedItemGlows", function(glow)
+        for _, v in pairs(GW.char_equipset_SavedItems) do
+            if v.HasPaperDollAzeriteItemOverlay then
+                v:UpdateCorruptedGlow(ItemLocation:CreateFromEquipmentSlot(v:GetID()), glow)
+            end
+        end
+    end)
+    GwDressingRoom.background:AddMaskTexture(GwCharacterWindow.backgroundMask)
 end
 GW.LoadPaperDoll = LoadPaperDoll

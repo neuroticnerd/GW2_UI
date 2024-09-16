@@ -20,6 +20,19 @@ local profs = {
     ["393"] = {["tag"] = "skin", ["atlas"] = "gather", ["idx"] = 1}
 }
 
+local PROFESSION_RANKS =  {};
+PROFESSION_RANKS[1] = {75,  APPRENTICE};
+PROFESSION_RANKS[2] = {150, JOURNEYMAN};
+PROFESSION_RANKS[3] = {225, EXPERT};
+PROFESSION_RANKS[4] = {300, ARTISAN};
+PROFESSION_RANKS[5] = {375, MASTER};
+PROFESSION_RANKS[6] = {450, GRAND_MASTER};
+PROFESSION_RANKS[7] = {525, ILLUSTRIOUS};
+PROFESSION_RANKS[8] = {600, ZEN_MASTER};
+PROFESSION_RANKS[9] = {700, DRAENOR_MASTER};
+PROFESSION_RANKS[10] = {800, LEGION_MASTER};
+PROFESSION_RANKS[11] = {950, BATTLE_FOR_AZEROTH_MASTER};
+
 local function profButton_OnEnter(self)
     GameTooltip:SetOwner(self, "ANCHOR_TOPLEFT", 0, 0)
     GameTooltip:ClearLines()
@@ -39,19 +52,22 @@ local profButtonSecure_OnDragStart =
 
 local function updateButton(self, spellIdx, unlearn)
     if spellIdx then
-        local tex = GetSpellBookItemTexture(spellIdx, BOOKTYPE_PROFESSION)
-        local name, _, spellId = GetSpellBookItemName(spellIdx, BOOKTYPE_PROFESSION)
+        local tex = C_SpellBook.GetSpellBookItemTexture(spellIdx, Enum.SpellBookSpellBank.Player)
+        local name = C_SpellBook.GetSpellBookItemName(spellIdx, Enum.SpellBookSpellBank.Player)
+        local spellBookItemInfo = C_SpellBook.GetSpellBookItemInfo(spellIdx, Enum.SpellBookSpellBank.Player)
+
         self.spellbookIndex = spellIdx
-        self.booktype = BOOKTYPE_PROFESSION
+        self.booktype = Enum.SpellBookSpellBank.Player
         self.skillName = name
         self.icon:SetTexture(tex)
         self.name:SetText(name)
         self.modifiedClick = TalProfButton_OnModifiedClick
+        self:RegisterForClicks("AnyUp", "AnyDown")
         self:SetAttribute("type1", "spell")
         self:SetAttribute("type2", "spell")
         self:SetAttribute("shift-type1", "modifiedClick")
         self:SetAttribute("shift-type2", "modifiedClick")
-        self:SetAttribute("spell", spellId)
+        self:SetAttribute("spell", spellBookItemInfo.spellID)
         self:SetAttribute("_ondragstart", profButtonSecure_OnDragStart)
         self:Enable()
         if unlearn then
@@ -88,7 +104,7 @@ local function unlearn_OnEnter(self)
 end
 GW.AddForProfiling("professions", "unlearn_OnEnter", unlearn_OnEnter)
 
-local function unlearn_OnClick(self, button)
+local function unlearn_OnClick(self)
     if InCombatLockdown() then
         PlaySound(44310)
         UIErrorsFrame:AddMessage(SPELL_FAILED_AFFECTING_COMBAT, 1.0, 0.1, 0.1, 1.0)
@@ -107,7 +123,7 @@ local function unlearnSpec_OnEnter(self)
 end
 GW.AddForProfiling("professions", "unlearnSpec_OnEnter", unlearnSpec_OnEnter)
 
-local function unlearnSpec_OnClick(self, button)
+local function unlearnSpec_OnClick(self)
     if InCombatLockdown() then
         PlaySound(44310)
         UIErrorsFrame:AddMessage(SPELL_FAILED_AFFECTING_COMBAT, 1.0, 0.1, 0.1, 1.0)
@@ -124,7 +140,7 @@ local function updateOverview(fmOverview)
     end
 
     local fmProfs = fmOverview.profs
-    local iProf1, iProf2, iArch, iFish, iCook, _ = GetProfessions()
+    local iProf1, iProf2, iArch, iFish, iCook = GetProfessions()
 
     local txR = 588 / 1024
     local txH = 110
@@ -143,9 +159,8 @@ local function updateOverview(fmOverview)
         elseif i == 5 then
             idx = iArch
         end
-        if idx ~= nil then
-            local name, icon, skill, skillMax, num, offset, profId, skillMod, specId, specOff, skillDesc =
-                GetProfessionInfo(idx)
+        if idx then
+            local name, icon, skill, skillMax, num, offset, profId, skillMod, specId, specOff, skillDesc = GetProfessionInfo(idx)
             fm.skillName = name
             fm.profId = profId
             fm.icon:SetTexture(icon)
@@ -161,11 +176,7 @@ local function updateOverview(fmOverview)
                     skillDesc = title
                 end
             end
-            if skillDesc ~= nil then
-                fm.desc:SetText(skillDesc)
-            else
-                fm.desc:SetText(nil)
-            end
+            fm.desc:SetText(skillDesc and skillDesc)
             fm.desc:SetWidth(220)
             fm.StatusBar:SetValue(skill / skillMax)
             if skillMod and skillMod ~= 0 then
@@ -256,7 +267,7 @@ local function updateOverview(fmOverview)
 end
 GW.AddForProfiling("professions", "updateOverview", updateOverview)
 
-local function overview_OnUpdate(self, elapsed)
+local function overview_OnUpdate(self)
     self:SetScript("OnUpdate", nil)
     updateOverview(self)
     self.queuedUpdate = false
@@ -273,14 +284,8 @@ local function queueUpdate(fm)
 end
 GW.AddForProfiling("professions", "queueUpdate", queueUpdate)
 
-local function overview_OnEvent(self, event, ...)
-    if not GW.inWorld then
-        return
-    end
-    if event == "SKILL_LINES_CHANGED" or event == "TRIAL_STATUS_UPDATE" or event == "SPELLS_CHANGED" then
-        if not self:IsShown() then
-            return
-        end
+local function overview_OnEvent(self)
+    if GW.inWorld and self:IsShown() then
         queueUpdate(self)
     end
 end

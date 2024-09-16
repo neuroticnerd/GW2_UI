@@ -20,7 +20,7 @@ local function spellButton_OnEnter(self)
 end
 GW.AddForProfiling("talents_pvp", "spellButton_OnEnter", spellButton_OnEnter)
 
-local function slotButton_OnDragStart(self, button)
+local function slotButton_OnDragStart(self)
     if InCombatLockdown() or self.isFuture or self.isPassive then
         return
     end
@@ -94,7 +94,7 @@ local function updatePicks(self)
             end
 
             slotInfo = C_SpecializationInfo.GetPvpTalentSlotInfo(slot.slotIndex)
-            if slotInfo.selectedTalentID then
+            if slotInfo and slotInfo.selectedTalentID then
                 slot.talentId = slotInfo.selectedTalentID
                 local _, _, icon, _, _, spellId, _ = GetPvpTalentInfoByID(slot.talentId)
                 local isPassive = IsPassiveSpell(spellId)
@@ -160,7 +160,7 @@ local function button_OnModifiedClick(self)
 end
 GW.AddForProfiling("talents_pvp", "button_OnModifiedClick", button_OnModifiedClick)
 
-local function spellButton_OnClick(self, button, down)
+local function spellButton_OnClick(self)
     if IsModifiedClick() then
         return button_OnModifiedClick(self)
     end
@@ -186,7 +186,7 @@ local function spellButton_OnClick(self, button, down)
 end
 GW.AddForProfiling("talents_pvp", "spellButton_OnClick", spellButton_OnClick)
 
-local function slotButton_OnClick(self, button, down)
+local function slotButton_OnClick(self)
     if not self.isEnabled then
         return
     end
@@ -219,10 +219,10 @@ local function setSlotButton(btn, info)
     if not btn.slotIndex then
         return
     end
-
+    
     local slotIndex = btn.slotIndex
     local unlock = C_SpecializationInfo.GetPvpTalentSlotUnlockLevel(slotIndex)
-    if info.enabled and UnitLevel("player") >= unlock then
+    if info.enabled and GW.mylevel >= unlock then
         btn.isEnabled = true
     else
         btn.isEnabled = false
@@ -245,16 +245,17 @@ end
 GW.AddForProfiling("talents_pvp", "setSlotButton", setSlotButton)
 
 local talentIds = {}
-local function UpdatePvPTab(fmSpellbook, fmTab)
-    local level = UnitLevel("player")
-
-    if level < SHOW_PVP_TALENT_LEVEL then
-        for k, v in pairs(fmTab.groups) do
+local function UpdatePvPTab(fmTab)
+    if not C_SpecializationInfo.CanPlayerUsePVPTalentUI() then
+        for _, v in pairs(fmTab.groups) do
             v:Hide()
         end
         fmTab.groups["lock"]:Show()
         return
     else
+        for _, v in pairs(fmTab.groups) do
+            v:Show()
+        end
         fmTab.groups["lock"]:Hide()
     end
 
@@ -270,21 +271,22 @@ local function UpdatePvPTab(fmSpellbook, fmTab)
 
     wipe(talentIds)
     local tidx = 1
-    for i, slot in ipairs({"TrinketSlot1", "TalentSlot1", "TalentSlot2", "TalentSlot3"}) do
+    for i, _ in ipairs({"TalentSlot1", "TalentSlot2", "TalentSlot3"}) do
         local btn = slotGroup.pool:Acquire()
         local row = 0
-        local col = (i - 1) % 4
+        local col = (i - 1) % 3
 
         btn.slotIndex = i
         local info = C_SpecializationInfo.GetPvpTalentSlotInfo(i)
+        if info then
+            setSlotButton(btn, info)
+            btn:SetPoint("TOPLEFT", slotGroup, "TOPLEFT", 55 + (50 * col), -37 + (-50 * row))
 
-        setSlotButton(btn, info)
-        btn:SetPoint("TOPLEFT", slotGroup, "TOPLEFT", 30 + (50 * col), -37 + (-50 * row))
-
-        for j, talentId in ipairs(info.availableTalentIDs) do
-            if not tContains(talentIds, talentId) then
-                talentIds[tidx] = talentId
-                tidx = tidx + 1
+            for _, talentId in ipairs(info.availableTalentIDs) do
+                if not tContains(talentIds, talentId) then
+                    talentIds[tidx] = talentId
+                    tidx = tidx + 1
+                end
             end
         end
     end
@@ -302,9 +304,8 @@ local function UpdatePvPTab(fmSpellbook, fmTab)
         end
     )
 
-    local pLevel = UnitLevel("player")
-    for i, talentId in ipairs(talentIds) do
-        local _, name, icon, selected, available, spellId, unlocked = GetPvpTalentInfoByID(talentId)
+    for _, talentId in ipairs(talentIds) do
+        local _, _, icon, _, _, spellId, _ = GetPvpTalentInfoByID(talentId)
         local isPassive = IsPassiveSpell(spellId)
         local btn
         if isPassive then
@@ -327,7 +328,7 @@ local function UpdatePvPTab(fmSpellbook, fmTab)
         btn.talentId = talentId
         btn.isPickable = true
         btn.unlockLevel = C_SpecializationInfo.GetPvpTalentUnlockLevel(talentId)
-        if pLevel < btn.unlockLevel then
+        if GW.mylevel < btn.unlockLevel then
             btn.isFuture = true
             btn.icon:SetDesaturated(true)
             btn.icon:SetAlpha(0.5)
@@ -347,7 +348,7 @@ local function UpdatePvPTab(fmSpellbook, fmTab)
 end
 GW.UpdatePvPTab = UpdatePvPTab
 
-local function slotPool_Resetter(self, btn)
+local function slotPool_Resetter(_, btn)
     btn:EnableMouse(false)
     btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     btn:RegisterForDrag("LeftButton")
@@ -364,20 +365,19 @@ local function slotPool_Resetter(self, btn)
     btn.icon:SetTexture("Interface/AddOns/GW2_UI/textures/talents/pvp_empty_icon")
 
     if not btn.mask then
-        local mask = UIParent:CreateMaskTexture()
-        mask:SetPoint("CENTER", btn.icon, "CENTER", 0, 0)
-        mask:SetTexture(
+        btn.mask = UIParent:CreateMaskTexture()
+        btn.mask:SetPoint("CENTER", btn.icon, "CENTER", 0, 0)
+        btn.mask:SetTexture(
             "Interface\\AddOns\\GW2_UI\\textures\\talents\\passive_border",
             "CLAMPTOBLACKADDITIVE",
             "CLAMPTOBLACKADDITIVE"
         )
-        mask:SetSize(40, 40)
-        btn.mask = mask
+        btn.mask:SetSize(40, 40)
     end
 end
 GW.AddForProfiling("talents_pvp", "slotPool_Resetter", slotPool_Resetter)
 
-local function activePool_Resetter(self, btn)
+local function activePool_Resetter(_, btn)
     btn:EnableMouse(false)
     btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     btn:Hide()
@@ -392,7 +392,7 @@ local function activePool_Resetter(self, btn)
 end
 GW.AddForProfiling("talents_pvp", "activePool_Resetter", activePool_Resetter)
 
-local function passivePool_Resetter(self, btn)
+local function passivePool_Resetter(_, btn)
     btn:EnableMouse(false)
     btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     btn:Hide()
@@ -406,16 +406,15 @@ local function passivePool_Resetter(self, btn)
     btn.icon:SetTexture(nil)
 
     if not btn.mask then
-        local mask = UIParent:CreateMaskTexture()
-        mask:SetPoint("CENTER", btn.icon, "CENTER", 0, 0)
-        mask:SetTexture(
+        btn.mask = UIParent:CreateMaskTexture()
+        btn.mask:SetPoint("CENTER", btn.icon, "CENTER", 0, 0)
+        btn.mask:SetTexture(
             "Interface\\AddOns\\GW2_UI\\textures\\talents\\passive_border",
             "CLAMPTOBLACKADDITIVE",
             "CLAMPTOBLACKADDITIVE"
         )
-        mask:SetSize(40, 40)
-        btn.mask = mask
-        btn.icon:AddMaskTexture(mask)
+        btn.mask:SetSize(40, 40)
+        btn.icon:AddMaskTexture(btn.mask)
     end
 end
 GW.AddForProfiling("talents_pvp", "passivePool_Resetter", passivePool_Resetter)
@@ -464,7 +463,7 @@ local function toggle_OnEnter(self)
     GameTooltip:AddLine(PVP_WAR_MODE_DESCRIPTION, nil, nil, nil, true)
     if ((not canToggleWarmodeOFF and not C_PvP.IsWarModeDesired()) or (canToggleWarmodeON or C_PvP.IsWarModeDesired())) == false then
         local text =
-            UnitFactionGroup("player") == PLAYER_FACTION_GROUP[0] and PVP_WAR_MODE_NOT_NOW_HORDE or
+            GW.myfaction == PLAYER_FACTION_GROUP[0] and PVP_WAR_MODE_NOT_NOW_HORDE or
             PVP_WAR_MODE_NOT_NOW_ALLIANCE
         local r, g, b = RED_FONT_COLOR:GetRGB()
         GameTooltip:AddLine(text, r, g, b, true)
@@ -494,7 +493,7 @@ local function CreatePvPTab(fmSpellbook)
     lockGroup.info:SetTextColor(1, 1, 1, 1)
     lockGroup.info:SetShadowColor(0, 0, 0, 1)
     lockGroup.info:SetShadowOffset(1, -1)
-    lockGroup.info:SetText(format(FEATURE_BECOMES_AVAILABLE_AT_LEVEL, SHOW_PVP_TALENT_LEVEL))
+    lockGroup.info:SetText(select(2, C_SpecializationInfo.CanPlayerUsePVPTalentUI()))
 
     warGroup:ClearAllPoints()
     warGroup:SetPoint("TOPLEFT", container, "TOPLEFT", -4, -31)

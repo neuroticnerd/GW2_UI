@@ -1,38 +1,66 @@
 local _, GW = ...
 
-local PowerBarColorCustom = {}
-GW.PowerBarColorCustom = PowerBarColorCustom
+GW.PowerBarColorCustom = {
+    MANA = {r = 37 / 255, g = 133 / 255, b = 240 / 255},
+    RAGE = {r = 240 / 255, g = 66 / 255, b = 37 / 255},
+    ENERGY = {r = 240 / 255, g = 200 / 255, b = 37 / 255},
+    LUNAR_POWER = {r = 130 / 255, g = 172 / 255, b = 230 / 255},
+    RUNIC_POWER = {r = 37 / 255, g = 214 / 255, b = 240 / 255},
+    FOCUS = {r = 240 / 255, g = 121 / 255, b = 37 / 255},
+    FURY = {r = 166 / 255, g = 37 / 255, b = 240 / 255},
+    PAIN = {r = 255/255, g = 156/255, b = 0},
+    MAELSTROM = {r = 0.00, g = 0.50, b = 1.00},
+    INSANITY = {r = 0.40, g = 0, b = 0.80},
+    CHI = {r = 0.71, g = 1.0, b = 0.92},
 
-PowerBarColorCustom["MANA"] = {r = 37 / 255, g = 133 / 255, b = 240 / 255}
-PowerBarColorCustom["RAGE"] = {r = 240 / 255, g = 66 / 255, b = 37 / 255}
-PowerBarColorCustom["ENERGY"] = {r = 240 / 255, g = 200 / 255, b = 37 / 255}
-PowerBarColorCustom["POWER_TYPE_ENERGY"] = PowerBarColorCustom["ENERGY"]
-PowerBarColorCustom["LUNAR_POWER"] = {r = 130 / 255, g = 172 / 255, b = 230 / 255}
-PowerBarColorCustom["RUNIC_POWER"] = {r = 37 / 255, g = 214 / 255, b = 240 / 255}
-PowerBarColorCustom["FOCUS"] = {r = 240 / 255, g = 121 / 255, b = 37 / 255}
-PowerBarColorCustom["FURY"] = {r = 166 / 255, g = 37 / 255, b = 240 / 255}
-PowerBarColorCustom["PAIN"] = {r = 255/255, g = 156/255, b = 0}
-PowerBarColorCustom["MAELSTROM"] = {r = 0.00, g = 0.50, b = 1.00}
-PowerBarColorCustom["INSANITY"] = {r = 0.40, g = 0, b = 0.80}
-PowerBarColorCustom["CHI"] = {r = 0.71, g = 1.0, b = 0.92}
+    -- vehicle colors
+    AMMOSLOT = {r = 0.80, g = 0.60, b = 0.00},
+    FUEL = {r = 0.0, g = 0.55, b = 0.5},
+    STAGGER = {r = 0.52, g = 1.0, b = 0.52},
+}
 
--- vehicle colors
-PowerBarColorCustom["AMMOSLOT"] = {r = 0.80, g = 0.60, b = 0.00}
-PowerBarColorCustom["FUEL"] = {r = 0.0, g = 0.55, b = 0.5}
-PowerBarColorCustom["STAGGER"] = {r = 0.52, g = 1.0, b = 0.52}
+GW.nameRoleIcon = {
+    TANK = "|TInterface/AddOns/GW2_UI/textures/party/roleicon-tank:0:0:0:0:64:64:4:60:4:60|t ",
+    HEALER = "|TInterface/AddOns/GW2_UI/textures/party/roleicon-healer:0:0:0:0:64:64:4:60:4:60|t ",
+    DAMAGER = "|TInterface/AddOns/GW2_UI/textures/party/roleicon-dps:0:0:0:0:64:64:4:60:4:60|t ",
+    NONE = ""
+}
 
-local DEBUFF_COLOR = {}
-GW.DEBUFF_COLOR = DEBUFF_COLOR
-DEBUFF_COLOR["none"] = {r = 220 / 255, g = 0, b = 0}
-DEBUFF_COLOR["Curse"] = {r = 97 / 255, g = 72 / 255, b = 177 / 255}
-DEBUFF_COLOR["Disease"] = {r = 177 / 255, g = 114 / 255, b = 72 / 255}
-DEBUFF_COLOR["Magic"] = {r = 72 / 255, g = 94 / 255, b = 177 / 255}
-DEBUFF_COLOR["Poison"] = {r = 94 / 255, g = 177 / 255, b = 72 / 255}
-DEBUFF_COLOR[""] = DEBUFF_COLOR["none"]
+GW.nameRoleIconPure = {
+    TANK = "Interface/AddOns/GW2_UI/textures/party/roleicon-tank",
+    HEALER = "Interface/AddOns/GW2_UI/textures/party/roleicon-healer",
+    DAMAGER = "Interface/AddOns/GW2_UI/textures/party/roleicon-dps",
+    NONE = ""
+}
 
---GW_FACTION_BAR_COLORS = FACTION_BAR_COLORS
---GW_FACTION_BAR_COLORS = {
-local FACTION_BAR_COLORS = {
+GW.professionBagColor = {
+    [8] = {r = .88, g = .73, b = .29}, --leatherworking
+    [16] = {r = .29, g = .30, b = .88}, --inscription
+    [32] = {r = .07, g = .71, b = .13}, --herbs
+    [64] = {r = .76, g = .02, b = .8}, --enchanting
+    [128] = {r = .91, g = .46, b = .18}, --engineering
+    [512] = {r = .03, g = .71, b = .81}, --gems
+    [1024] = {r = .54, g = .40, b = .04}, --Mining Bag
+    [32768] = {r = .42, g = .59, b = 1}, --fishing
+    [65536] = {r = .87, g = .05, b = .25} --cooking
+}
+
+GW.TRACKER_TYPE_COLOR = {
+    QUEST = {r = 221 / 255, g = 198 / 255, b = 68 / 255},
+    CAMPAIGN = {r = 121 / 255, g = 222 / 255, b = 47 / 255},
+    EVENT = {r = 240 / 255, g = 121 / 255, b = 37 / 255},
+    SCENARIO = {r = 171 / 255, g = 37 / 255, b = 240 / 255},
+    BOSS = {r = 240 / 255, g = 37 / 255, b = 37 / 255},
+    ARENA = {r = 240 / 255, g = 37 / 255, b = 37 / 255},
+    ACHIEVEMENT = {r = 37 / 255, g = 240 / 255, b = 172 / 255},
+    DAILY = {r = 68 / 255, g = 192 / 255, b = 250 / 255},
+    TORGHAST = {r = 109 / 255, g = 161 / 255, b = 207 / 255},
+    RECIPE = {r = 228 / 255, g = 157 / 255, b = 0 / 255},
+    MONTHLYACTIVITY = {r = 228 / 255, g = 157 / 255, b = 0 / 255},
+    DELVE = {r = 171 / 255, g = 37 / 255, b = 240 / 255}
+}
+
+GW.FACTION_BAR_COLORS = {
     [1] = {r = 0.8, g = 0.3, b = 0.22},
     [2] = {r = 0.8, g = 0.3, b = 0.22},
     [3] = {r = 0.75, g = 0.27, b = 0},
@@ -41,210 +69,273 @@ local FACTION_BAR_COLORS = {
     [6] = {r = 0, g = 0.6, b = 0.1},
     [7] = {r = 0, g = 0.6, b = 0.1},
     [8] = {r = 0, g = 0.6, b = 0.1},
-    [9] = {r = 0.22, g = 0.37, b = 0.98}, --Paragon
-    [10] = {r = 0.09, g = 0.29, b = 0.79} --Azerite
+    [9] = {r = 0.22, g = 0.37, b = 0.98},   --Paragon
+    [10] = {r = 0.09, g = 0.29, b = 0.79},   --Azerite
+    [11] = {r = 0, g = 0.74, b = 0.95},    --(Renown)
 }
-GW.FACTION_BAR_COLORS = FACTION_BAR_COLORS
 
-local COLOR_FRIENDLY = {
-    [1] = {r = 88 / 255, g = 170 / 255, b = 68 / 255},
-    [2] = {r = 159 / 255, g = 36 / 255, b = 20 / 255},
-    [3] = {r = 159 / 255, g = 159 / 255, b = 159 / 255}
+GW.COLOR_FRIENDLY = {
+    [1] = {r = 88 / 255, g = 170 / 255, b = 68 / 255},  --friendly #58aa44
+    [2] = {r = 159 / 255, g = 36 / 255, b = 20 / 255},  --enemy    #9f2414
+    [3] = {r = 159 / 255, g = 159 / 255, b = 159 / 255} --tapped   #9f9f9f
 }
-GW.COLOR_FRIENDLY = COLOR_FRIENDLY
+GW.BLOOD_SPARK = {
+    [0] = {left = 0, right = 0.125, top = 0, bottom = 0.5},
+    [1] = {left = 0, right = 0.125, top = 0, bottom = 0.5},
+    [2] = {left = 0.125, right = 0.125 * 2, top = 0, bottom = 0.5},
+    [3] = {left = 0.125 * 2, right = 0.125 * 3, top = 0, bottom = 0.5},
+    [4] = {left = 0.125 * 3, right = 0.125 * 4, top = 0, bottom = 0.5},
+    [5] = {left = 0.125 * 4, right = 0.125 * 5, top = 0, bottom = 0.5},
+    [6] = {left = 0.125 * 5, right = 0.125 * 6, top = 0, bottom = 0.5},
+    [7] = {left = 0.125 * 6, right = 0.125 * 7, top = 0, bottom = 0.5},
+    [8] = {left = 0.125 * 7, right = 0.125 * 8, top = 0, bottom = 0.5},
 
-local bloodSpark = {}
-GW.BLOOD_SPARK = bloodSpark
+    [9] = {left = 0, right = 0.125, top = 0.5, bottom = 1},
+    [10] = {left = 0.125, right = 0.125 * 2, top = 0.5, bottom = 1},
+    [11] = {left = 0.125 * 2, right = 0.125 * 3, top = 0.5, bottom = 1},
+    [12] = {left = 0.125 * 3, right = 0.125 * 4, top = 0.5, bottom = 1},
+    [13] = {left = 0.125 * 4, right = 0.125 * 5, top = 0.5, bottom = 1},
+    [14] = {left = 0.125 * 5, right = 0.125 * 6, top = 0.5, bottom = 1},
+    [15] = {left = 0.125 * 6, right = 0.125 * 7, top = 0.5, bottom = 1},
+    [16] = {left = 0.125 * 7, right = 0.125 * 8, top = 0.5, bottom = 1},
 
-bloodSpark[0] = {left = 0, right = 0.125, top = 0, bottom = 0.5}
-bloodSpark[1] = {left = 0, right = 0.125, top = 0, bottom = 0.5}
-bloodSpark[2] = {left = 0.125, right = 0.125 * 2, top = 0, bottom = 0.5}
-bloodSpark[3] = {left = 0.125 * 2, right = 0.125 * 3, top = 0, bottom = 0.5}
-bloodSpark[4] = {left = 0.125 * 3, right = 0.125 * 4, top = 0, bottom = 0.5}
-bloodSpark[5] = {left = 0.125 * 4, right = 0.125 * 5, top = 0, bottom = 0.5}
-bloodSpark[6] = {left = 0.125 * 5, right = 0.125 * 6, top = 0, bottom = 0.5}
-bloodSpark[7] = {left = 0.125 * 6, right = 0.125 * 7, top = 0, bottom = 0.5}
-bloodSpark[8] = {left = 0.125 * 7, right = 0.125 * 8, top = 0, bottom = 0.5}
-
-bloodSpark[9] = {left = 0, right = 0.125, top = 0.5, bottom = 1}
-bloodSpark[10] = {left = 0.125, right = 0.125 * 2, top = 0.5, bottom = 1}
-bloodSpark[11] = {left = 0.125 * 2, right = 0.125 * 3, top = 0.5, bottom = 1}
-bloodSpark[12] = {left = 0.125 * 3, right = 0.125 * 4, top = 0.5, bottom = 1}
-bloodSpark[13] = {left = 0.125 * 4, right = 0.125 * 5, top = 0.5, bottom = 1}
-bloodSpark[14] = {left = 0.125 * 5, right = 0.125 * 6, top = 0.5, bottom = 1}
-bloodSpark[15] = {left = 0.125 * 6, right = 0.125 * 7, top = 0.5, bottom = 1}
-bloodSpark[16] = {left = 0.125 * 7, right = 0.125 * 8, top = 0.5, bottom = 1}
-
-bloodSpark[17] = {left = 0, right = 0.125, top = 0, bottom = 0.5}
-bloodSpark[18] = {left = 0.125, right = 0.125 * 2, top = 0, bottom = 0.5}
-bloodSpark[19] = {left = 0.125 * 2, right = 0.125 * 3, top = 0, bottom = 0.5}
-bloodSpark[20] = {left = 0.125 * 3, right = 0.125 * 4, top = 0, bottom = 0.5}
-bloodSpark[21] = {left = 0.125 * 4, right = 0.125 * 5, top = 0, bottom = 0.5}
-bloodSpark[22] = {left = 0.125 * 5, right = 0.125 * 6, top = 0, bottom = 0.5}
-bloodSpark[23] = {left = 0.125 * 6, right = 0.125 * 7, top = 0, bottom = 0.5}
-bloodSpark[24] = {left = 0.125 * 7, right = 0.125 * 8, top = 0, bottom = 0.5}
-
-local CLASS_ICONS = {}
-GW.CLASS_ICONS = CLASS_ICONS
-
-CLASS_ICONS[0] = {l = 0.0625 * 12, r = 0.0625 * 13, t = 0, b = 1}
-
-CLASS_ICONS[1] = {l = 0.0625 * 11, r = 0.0625 * 12, t = 0, b = 1}
-CLASS_ICONS[2] = {l = 0.0625 * 10, r = 0.0625 * 11, t = 0, b = 1}
-CLASS_ICONS[3] = {l = 0.0625 * 9, r = 0.0625 * 10, t = 0, b = 1}
-CLASS_ICONS[4] = {l = 0.0625 * 8, r = 0.0625 * 9, t = 0, b = 1}
-CLASS_ICONS[5] = {l = 0.0625 * 7, r = 0.0625 * 8, t = 0, b = 1}
-CLASS_ICONS[6] = {l = 0.0625 * 6, r = 0.0625 * 7, t = 0, b = 1}
-CLASS_ICONS[7] = {l = 0.0625 * 5, r = 0.0625 * 6, t = 0, b = 1}
-CLASS_ICONS[8] = {l = 0.0625 * 4, r = 0.0625 * 5, t = 0, b = 1}
-CLASS_ICONS[9] = {l = 0.0625 * 3, r = 0.0625 * 4, t = 0, b = 1}
-CLASS_ICONS[10] = {l = 0.0625 * 2, r = 0.0625 * 3, t = 0, b = 1}
-CLASS_ICONS[11] = {l = 0.0625 * 1, r = 0.0625 * 2, t = 0, b = 1}
-CLASS_ICONS[12] = {l = 0, r = 0.0625 * 1, t = 0, b = 1}
-CLASS_ICONS["WARRIOR"] = CLASS_ICONS[1]
-CLASS_ICONS["PALADIN"] = CLASS_ICONS[2]
-CLASS_ICONS["HUNTER"] = CLASS_ICONS[3]
-CLASS_ICONS["ROGUE"] = CLASS_ICONS[4]
-CLASS_ICONS["PRIEST"] = CLASS_ICONS[5]
-CLASS_ICONS["DEATHKNIGHT"] = CLASS_ICONS[6]
-CLASS_ICONS["SHAMAN"] = CLASS_ICONS[7]
-CLASS_ICONS["MAGE"] = CLASS_ICONS[8]
-CLASS_ICONS["WARLOCK"] = CLASS_ICONS[9]
-CLASS_ICONS["MONK"] = CLASS_ICONS[10]
-CLASS_ICONS["DRUID"] = CLASS_ICONS[11]
-CLASS_ICONS["DEMONHUNTER"] = CLASS_ICONS[12]
-CLASS_ICONS["dead"] = {l = 0.0625 * 12, r = 0.0625 * 13, t = 0, b = 1}
-
-local CLASS_COLORS_RAIDFRAME = {}
-GW.CLASS_COLORS_RAIDFRAME = CLASS_COLORS_RAIDFRAME
-
-CLASS_COLORS_RAIDFRAME[1] = {r = 90 / 255, g = 54 / 255, b = 38 / 255} --Warrior
-CLASS_COLORS_RAIDFRAME[2] = {r = 177 / 255, g = 72 / 255, b = 117 / 255} --Paladin
-CLASS_COLORS_RAIDFRAME[3] = {r = 99 / 255, g = 125 / 255, b = 53 / 255} --Hunter
-CLASS_COLORS_RAIDFRAME[4] = {r = 190 / 255, g = 183 / 255, b = 79 / 255} --Rogue
-CLASS_COLORS_RAIDFRAME[5] = {r = 205 / 255, g = 205 / 255, b = 205 / 255} --Priest
-CLASS_COLORS_RAIDFRAME[6] = {r = 148 / 255, g = 62 / 255, b = 62 / 255} --Death Knight
-CLASS_COLORS_RAIDFRAME[7] = {r = 30 / 255, g = 44 / 255, b = 149 / 255} -- Shaman
-CLASS_COLORS_RAIDFRAME[8] = {r = 62 / 255, g = 121 / 255, b = 149 / 255} -- Mage
-CLASS_COLORS_RAIDFRAME[9] = {r = 125 / 255, g = 88 / 255, b = 154 / 255} -- Warlock
-CLASS_COLORS_RAIDFRAME[10] = {r = 66 / 255, g = 151 / 255, b = 112 / 255} -- Monk
-CLASS_COLORS_RAIDFRAME[11] = {r = 158 / 255, g = 103 / 255, b = 37 / 255} -- Druid
-CLASS_COLORS_RAIDFRAME[12] = {r = 72 / 255, g = 38 / 255, b = 148 / 255} -- Demon Hunter
-
-local FACTION_COLOR = {}
-GW.FACTION_COLOR = FACTION_COLOR
-FACTION_COLOR[1] = {r = 163 / 255, g = 46 / 255, b = 54 / 255}
-FACTION_COLOR[2] = {r = 57 / 255, g = 115 / 255, b = 186 / 255}
-
-local TARGET_FRAME_ART = {
-    ["minus"] = "Interface\\AddOns\\GW2_UI\\textures\\targetshadow",
-    ["minus"] = "Interface\\AddOns\\GW2_UI\\textures\\targetshadow",
-    ["normal"] = "Interface\\AddOns\\GW2_UI\\textures\\targetshadow",
-    ["elite"] = "Interface\\AddOns\\GW2_UI\\textures\\targetShadowElit",
-    ["rare"] = "Interface\\AddOns\\GW2_UI\\textures\\targetShadowRare",
-    ["rareelite"] = "Interface\\AddOns\\GW2_UI\\textures\\targetShadowRare",
-    ["worldboss"] = "Interface\\AddOns\\GW2_UI\\textures\\targetshadow_boss",
-    ["boss"] = "Interface\\AddOns\\GW2_UI\\textures\\targetshadow_boss",
-    ["prestige1"] = "Interface\\AddOns\\GW2_UI\\textures\\targetshadow_p1",
-    ["prestige2"] = "Interface\\AddOns\\GW2_UI\\textures\\targetshadow_p2",
-    ["prestige3"] = "Interface\\AddOns\\GW2_UI\\textures\\targetshadow_p3",
-    ["prestige4"] = "Interface\\AddOns\\GW2_UI\\textures\\targetshadow_p4"
+    [17] = {left = 0, right = 0.125, top = 0, bottom = 0.5},
+    [18] = {left = 0.125, right = 0.125 * 2, top = 0, bottom = 0.5},
+    [19] = {left = 0.125 * 2, right = 0.125 * 3, top = 0, bottom = 0.5},
+    [20] = {left = 0.125 * 3, right = 0.125 * 4, top = 0, bottom = 0.5},
+    [21] = {left = 0.125 * 4, right = 0.125 * 5, top = 0, bottom = 0.5},
+    [22] = {left = 0.125 * 5, right = 0.125 * 6, top = 0, bottom = 0.5},
+    [23] = {left = 0.125 * 6, right = 0.125 * 7, top = 0, bottom = 0.5},
+    [24] = {left = 0.125 * 7, right = 0.125 * 8, top = 0, bottom = 0.5}
 }
-GW.TARGET_FRAME_ART = TARGET_FRAME_ART
 
-local DODGEBAR_SPELLS = {}
-GW.DODGEBAR_SPELLS = DODGEBAR_SPELLS
-DODGEBAR_SPELLS[1] = {100, 198304}
-DODGEBAR_SPELLS[2] = {190784}
-DODGEBAR_SPELLS[3] = {781, 190925}
-DODGEBAR_SPELLS[4] = {195457}
-DODGEBAR_SPELLS[5] = {121536}
-DODGEBAR_SPELLS[6] = {212552}
-DODGEBAR_SPELLS[7] = {196884}
-DODGEBAR_SPELLS[8] = {212653, 1953}
-DODGEBAR_SPELLS[9] = {48018}
-DODGEBAR_SPELLS[10] = {109132, 115008}
-DODGEBAR_SPELLS[11] = {102280, 102401}
-DODGEBAR_SPELLS[12] = {189110, 195072}
+GW.CLASS_ICONS = {
+    [0] = {l = 0.0625 * 12, r = 0.0625 * 13, t = 0, b = 1},
 
-local INDICATORS = {"BAR", "TOPLEFT","TOP", "TOPRIGHT", "LEFT", "CENTER", "RIGHT"}
-GW.INDICATORS = INDICATORS
+    [1] = {l = 0.0625 * 11, r = 0.0625 * 12, t = 0, b = 1},
+    [2] = {l = 0.0625 * 10, r = 0.0625 * 11, t = 0, b = 1},
+    [3] = {l = 0.0625 * 9, r = 0.0625 * 10, t = 0, b = 1},
+    [4] = {l = 0.0625 * 8, r = 0.0625 * 9, t = 0, b = 1},
+    [5] = {l = 0.0625 * 7, r = 0.0625 * 8, t = 0, b = 1},
+    [6] = {l = 0.0625 * 6, r = 0.0625 * 7, t = 0, b = 1},
+    [7] = {l = 0.0625 * 5, r = 0.0625 * 6, t = 0, b = 1},
+    [8] = {l = 0.0625 * 4, r = 0.0625 * 5, t = 0, b = 1},
+    [9] = {l = 0.0625 * 3, r = 0.0625 * 4, t = 0, b = 1},
+    [10] = {l = 0.0625 * 2, r = 0.0625 * 3, t = 0, b = 1},
+    [11] = {l = 0.0625 * 1, r = 0.0625 * 2, t = 0, b = 1},
+    [12] = {l = 0, r = 0.0625 * 1, t = 0, b = 1},
+    [13] = {l = 0.0625 * 13, r = 0.0625 * 14, t = 0, b = 1},
+    dead = {l = 0.0625 * 12, r = 0.0625 * 13, t = 0, b = 1}
+}
+GW.CLASS_ICONS.WARRIOR = GW.CLASS_ICONS[1]
+GW.CLASS_ICONS.PALADIN = GW.CLASS_ICONS[2]
+GW.CLASS_ICONS.HUNTER = GW.CLASS_ICONS[3]
+GW.CLASS_ICONS.ROGUE = GW.CLASS_ICONS[4]
+GW.CLASS_ICONS.PRIEST = GW.CLASS_ICONS[5]
+GW.CLASS_ICONS.DEATHKNIGHT = GW.CLASS_ICONS[6]
+GW.CLASS_ICONS.SHAMAN = GW.CLASS_ICONS[7]
+GW.CLASS_ICONS.MAGE = GW.CLASS_ICONS[8]
+GW.CLASS_ICONS.WARLOCK = GW.CLASS_ICONS[9]
+GW.CLASS_ICONS.MONK = GW.CLASS_ICONS[10]
+GW.CLASS_ICONS.DRUID = GW.CLASS_ICONS[11]
+GW.CLASS_ICONS.DEMONHUNTER = GW.CLASS_ICONS[12]
+GW.CLASS_ICONS.EVOKER = GW.CLASS_ICONS[13]
+
+GW.GW_CLASS_COLORS = {
+    WARRIOR = {r = 90 / 255, g = 54 / 255, b = 38 / 255, a = 1},
+    PALADIN = {r = 177 / 255, g = 72 / 255, b = 117 / 255, a = 1},
+    HUNTER = {r = 99 / 255, g = 125 / 255, b = 53 / 255, a = 1},
+    ROGUE = {r = 190 / 255, g = 183 / 255, b = 79 / 255, a = 1},
+    PRIEST = {r = 205 / 255, g = 205 / 255, b = 205 / 255, a = 1},
+    DEATHKNIGHT = {r = 148 / 255, g = 62 / 255, b = 62 / 255, a = 1},
+    SHAMAN = {r = 30 / 255, g = 44 / 255, b = 149 / 255, a = 1},
+    --MAGE = {r = 62 / 255, g = 121 / 255, b = 149 / 255, a = 1},
+    MAGE = {r = 101 / 255, g = 157 / 255, b = 184 / 255, a = 1},
+    WARLOCK = {r = 125 / 255, g = 88 / 255, b = 154 / 255, a = 1},
+    MONK = {r = 66 / 255, g = 151 / 255, b = 112 / 255, a = 1},
+    DRUID = {r = 158 / 255, g = 103 / 255, b = 37 / 255, a = 1},
+    DEMONHUNTER = {r = 72 / 255, g = 38 / 255, b = 148 / 255, a = 1},
+    --EVOKER = {r = 51 / 255, g = 147 / 255, b = 127 / 255, a = 1},
+    EVOKER = {r = 56 / 255, g = 99 / 255, b = 113 / 255, a = 1}
+}
+
+GW.FACTION_COLOR = {
+    [1] = {r = 163 / 255, g = 46 / 255, b = 54 / 255}, --Horde
+    [2] = {r = 57 / 255, g = 115 / 255, b = 186 / 255} --Alliance
+}
+
+GW.TARGET_FRAME_ART = {
+    minus = "Interface/AddOns/GW2_UI/textures/units/targetshadow",
+    normal = "Interface/AddOns/GW2_UI/textures/units/targetshadow",
+    elite = "Interface/AddOns/GW2_UI/textures/units/targetShadowElit",
+    rare = "Interface/AddOns/GW2_UI/textures/units/targetShadowRare",
+    rareelite = "Interface/AddOns/GW2_UI/textures/units/targetShadowRare",
+    worldboss = "Interface/AddOns/GW2_UI/textures/units/targetshadow_boss",
+    boss = "Interface/AddOns/GW2_UI/textures/units/targetshadow_boss",
+    prestige1 = "Interface/AddOns/GW2_UI/textures/units/targetshadow_p1",
+    prestige2 = "Interface/AddOns/GW2_UI/textures/units/targetshadow_p2",
+    prestige3 = "Interface/AddOns/GW2_UI/textures/units/targetshadow_p3",
+    prestige4 = "Interface/AddOns/GW2_UI/textures/units/targetshadow_p4",
+    realboss = "Interface/AddOns/GW2_UI/textures/units/targetshadow-raidboss"
+}
+
+GW.REALM_FLAGS = {
+    enUS = "|TInterface/AddOns/GW2_UI/textures/flags/us:10:12:0:0|t",
+    ptBR = "|TInterface/AddOns/GW2_UI/textures/flags/br:10:12:0:0|t",
+    ptPT = "|TInterface/AddOns/GW2_UI/textures/flags/pt:10:12:0:0|t",
+    esMX = "|TInterface/AddOns/GW2_UI/textures/flags/mx:10:12:0:0|t",
+    deDE = "|TInterface/AddOns/GW2_UI/textures/flags/de:10:12:0:0|t",
+    enGB = "|TInterface/AddOns/GW2_UI/textures/flags/gb:10:12:0:0|t",
+    koKR = "|TInterface/AddOns/GW2_UI/textures/flags/kr:10:12:0:0|t",
+    frFR = "|TInterface/AddOns/GW2_UI/textures/flags/fr:10:12:0:0|t",
+    esES = "|TInterface/AddOns/GW2_UI/textures/flags/es:10:12:0:0|t",
+    itIT = "|TInterface/AddOns/GW2_UI/textures/flags/it:10:12:0:0|t",
+    ruRU = "|TInterface/AddOns/GW2_UI/textures/flags/ru:10:12:0:0|t",
+    zhTW = "|TInterface/AddOns/GW2_UI/textures/flags/tw:10:12:0:0|t",
+    zhCN = "|TInterface/AddOns/GW2_UI/textures/flags/cn:10:12:0:0|t"
+}
+
+GW.INDICATORS = {"BAR", "TOPLEFT", "TOP", "TOPRIGHT", "LEFT", "CENTER", "RIGHT"}
+GW.indicatorsText = {"Bar", "Top Left", "Top", "Top Right", "Left", "Center", "Right"}
 
 -- Taken from ElvUI: https://git.tukui.org/elvui/elvui/blob/master/ElvUI/Settings/Filters/UnitFrame.lua
--- Format: {class = {id = color, ...}, ...}
-local AURAS_INDICATORS = {
+-- Format: {class = {id = {r, g, b[, <spell-id-same-slot>]} ...}, ...}
+GW.AURAS_INDICATORS = {
     PRIEST = {
         [194384] =  {1, 1, 0.66},       -- Atonement
+        [214206] =  {1, 1, 0.66},       -- Atonement (PvP)
         [41635] =   {1, 1, 0.66},       -- Prayer of Mending
         [193065] =  {0.54, 0.21, 0.78}, -- Masochism
         [139] =     {0.4, 0.7, 0.2},    -- Renew
         [17] =      {0.7, 0.7, 0.7},    -- Power Word: Shield
         [47788] =   {0.86, 0.45, 0},    -- Guardian Spirit
-        [33206] =   {0.47, 0.35, 0.74}  -- Pain Suppression
+        [33206] =   {0.47, 0.35, 0.74}, -- Pain Suppression
+        [6788]   =  {0.89, 0.1, 0.1},   -- Weakened Soul
+        [10060]   =  {1, 0.81, 0.11},   -- Power Infusion
+        [77489]   =  {0.75, 1, 0.3},    -- Echo of Light
     },
     DRUID = {
         [774] =     {0.8, 0.4, 0.8},    -- Rejuvenation
         [155777] =  {0.8, 0.4, 0.8},    -- Germination
         [8936] =    {0.2, 0.8, 0.2},    -- Regrowth
         [33763] =   {0.4, 0.8, 0.2},    -- Lifebloom
+        [188550] =  {0.4, 0.8, 0.2},    -- Lifebloom Legendary version
         [48438] =   {0.8, 0.4, 0},      -- Wild Growth
         [207386] =  {0.4, 0.2, 0.8},    -- Spring Blossoms
         [102351] =  {0.2, 0.8, 0.8},    -- Cenarion Ward (Initial Buff)
         [102352] =  {0.2, 0.8, 0.8},    -- Cenarion Ward (HoT)
         [200389] =  {1, 1, 0.4},        -- Cultivation
+        [203554] =  {1, 1, 0.4},        -- Focused Growth (PvP)
+        [391891] =  {0.01, 0.75, 0.6},  -- Adaptive Swarm
+        [157982] =  {0.75, 0.75, 0.75}, -- Tranquility
     },
     PALADIN = {
-        [53563] =   {0.7, 0.3, 0.7},    -- Beacon of Light
-        [156910] =  {0.7, 0.3, 0.7},    -- Beacon of Faith
-        [200025] =  {0.7, 0.3, 0.7},    -- Beacon of Virtue
+        [53563] =   {1, 0.3, 0},        -- Beacon of Light
+        [156910] =  {0, 0.7, 1, 53563}, -- Beacon of Faith
+        [200025] =  {1, 0.85, 0, 53563},-- Beacon of Virtue
         [1022] =    {0.2, 0.2, 1},      -- Hand of Protection
         [1044] =    {0.89, 0.45, 0},    -- Hand of Freedom
         [6940] =    {0.89, 0.1, 0.1},   -- Hand of Sacrifice
         [223306] =  {0.7, 0.7, 0.3},    -- Bestow Faith
+        [287280] =  {1, 0.5, 0},        -- Glimmer of Light
+        [157047] =  {0.15, 0.58, 0.84}, -- Saved by the Light (T25 Talent)
+        [204018] =  {0.2, 0.2, 1},      -- Blessing of Spellwarding
+        [148039] =  {0.98, 0.5, 0.11},  -- Barrier of Faith (accumulation)
+        [395180] =  {0.93, 0.8, 0.36},  -- Barrier of Faith (absorbtion)
     },
     SHAMAN = {
-        [61295] =   {0, 0.4, 0.53},     -- Riptide
-        [974] =     {0.42, 0.74, 0},    -- Earth Shield
+        [61295] =   {0.7, 0.3, 0.7},     -- Riptide
+        [974] =     {0.91, 0.8, 0.44},    -- Earth Shield
+        [383648] =     {0.91, 0.8, 0.44},    -- Earth Shield (Elemental Orbit)
     },
     MONK = {
+        [115175] =  {0.6, 0.9, 0.9},    -- Soothing Mist
         [119611] =  {0.3, 0.8, 0.6},    -- Renewing Mist
         [116849] =  {0.2, 0.8, 0.2},    -- Life Cocoon
         [124682] =  {0.8, 0.8, 0.25},   -- Enveloping Mist
         [191840] =  {0.27, 0.62, 0.7},  -- Essence Font
+        [116841] =  {0.12, 1.00, 0.53}, -- Tiger's Lust (Freedom)
+        [325209] =  {0.3, 0.8, 0.6},    -- Enveloping Breath
     },
     ROGUE = {
         [57934] =   {0.89, 0.09, 0.05}  -- Tricks of the Trade
     },
     WARRIOR = {
-        [114030] =  {0.2, 0.2, 1},      -- Vigilance
         [3411] =    {0.89, 0.09, 0.05}  -- Intervene
     },
-    HUNTER = {},
+    HUNTER = {
+        [90361]  = {0.34, 0.47, 0.31},  -- Spirit Mend (HoT)
+    },
     DEMONHUNTER = {},
     WARLOCK = {},
     MAGE = {},
     DEATHKNIGHT = {},
+    EVOKER = {
+        [355941] =  {0.33, 0.33, 0.77},     -- Dream Breath
+        [363502] =  {0.33, 0.33, 0.7},      -- Dream Flight
+        [366155] =  {0.14, 1.00, 0.88},     -- Reversion
+        [364343] =  {0.13, 0.87, 0.50},     -- Echo
+        [357170] =  {0.11, 0.57, 0.7},      -- Time Dilation
+        [376788] =  {0.25, 0.25, 0.58},     -- Dreaon Breath (echo)
+        [367364] =  {0.09, 0.69, 0.61},     -- Reversion (echo)
+        [373267] =  {0.82, 0.29, 0.24},     -- Life Bind (Verdant Embrace)
+        [360827] =  {0.33, 0.33, 0.77},     -- Blistering Scales
+        [410089] =  {0.13, 0.87, 0.50},     -- Prescience
+        [395296] =  {0.98, 0.44, 0.00},     -- Ebon Might < self
+        [395152] =  {0.98, 0.44, 0.00},     -- Ebon Might < others
+        [406732] =  {0.82, 0.29, 0.24},     -- Spatial Paradox
+    },
     PET = {
         [193396] =  {0.6, 0.2, 0.8},    -- Demonic Empowerment
         [19615] =   {0.89, 0.09, 0.05}, -- Frenzy
         [136] =     {0.2, 0.8, 0.2}     -- Mend Pet
     }
 }
-GW.AURAS_INDICATORS = AURAS_INDICATORS
 
 -- Never show theses auras
-local AURAS_IGNORED = {
+GW.AURAS_IGNORED = {
     57723, -- Sated
     57724, -- Exhaustion
     80354, -- Temporal Displacement
     264689 -- Fatigued
 }
-GW.AURAS_IGNORED = AURAS_IGNORED
 
 -- Show these auras only when they are missing
-local AURAS_MISSING = {
+GW.AURAS_MISSING = {
     21562,  -- Power Word: Fortitude
     6673,   -- Battle Shout
     1459    -- Arcane Intellect
 }
-GW.AURAS_MISSING = AURAS_MISSING
+
+GW.MagePortals = {
+    -- Alliance
+    [10059] = true,		-- Stormwind
+    [11416] = true,		-- Ironforge
+    [11419] = true,		-- Darnassus
+    [32266] = true,		-- Exodar
+    [49360] = true,		-- Theramore
+    [33691] = true,		-- Shattrath
+    [88345] = true,		-- Tol Barad
+    [132620] = true,	-- Vale of Eternal Blossoms
+    [176246] = true,	-- Stormshield
+    [281400] = true,	-- Boralus
+    -- Horde
+    [11417] = true,		-- Orgrimmar
+    [11420] = true,		-- Thunder Bluff
+    [11418] = true,		-- Undercity
+    [32267] = true,		-- Silvermoon
+    [49361] = true,		-- Stonard
+    [35717] = true,		-- Shattrath
+    [88346] = true,		-- Tol Barad
+    [132626] = true,	-- Vale of Eternal Blossoms
+    [176244] = true,	-- Warspear
+    [281402] = true,	-- Dazar'alor
+    -- Alliance/Horde
+    [53142] = true,		-- Dalaran
+    [120146] = true,	-- Ancient Dalaran
+    [224871] = true,	-- Dalaran, Broken Isles
+    [344597] = true,	-- Oribos
+    [395289] = true,	-- DF
+}
+
+GW.WINDOW_FADE_DURATION = 0.2

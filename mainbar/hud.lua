@@ -1,70 +1,44 @@
 local _, GW = ...
+local L = GW.L
 local CommaValue = GW.CommaValue
-local RoundDec = GW.RoundDec
 local lerp = GW.lerp
-local GetSetting = GW.GetSetting
-local RoundInt = GW.RoundInt
 local Diff = GW.Diff
-local VERSION_STRING = GW.VERSION_STRING
 local animations = GW.animations
 local AddToAnimation = GW.AddToAnimation
-local StopAnimation = GW.StopAnimation
-local Self_Hide = GW.Self_Hide
 local FACTION_BAR_COLORS = GW.FACTION_BAR_COLORS
 
 -- forward function defs
-local displayRewards
-local createOrderBar
-
 local experiencebarAnimation = 0
-local GW_LEVELING_REWARD_AVALIBLE
 
 local gw_reputation_vals = nil
 local gw_honor_vals = nil
 
-local function artifactPoints()
-    local _, _, _, _, totalXP, pointsSpent, _, _, _, _, _, _, artifactTier = C_ArtifactUI.GetEquippedArtifactInfo()
-
-    local numPoints = pointsSpent
-    local xpForNextPoint = C_ArtifactUI.GetCostForPointAtRank(pointsSpent, artifactTier)
-    while totalXP >= xpForNextPoint and xpForNextPoint > 0 do
-        totalXP = totalXP - xpForNextPoint
-
-        pointsSpent = pointsSpent + 1
-        numPoints = numPoints + 1
-
-        xpForNextPoint = C_ArtifactUI.GetCostForPointAtRank(pointsSpent, artifactTier)
-    end
-    return numPoints, totalXP, xpForNextPoint
-end
-GW.AddForProfiling("hud", "artifactPoints", artifactPoints)
-
-local function xpbar_OnEnter()
-    GameTooltip:SetOwner(_G["GwExperienceFrame"], "ANCHOR_CURSOR")
+local function xpbar_OnEnter(self)
+    GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
     GameTooltip:ClearLines()
 
-    local valCurrent = UnitXP("Player")
-    local valMax = UnitXPMax("Player")
+    local valCurrent = UnitXP("player")
+    local valMax = UnitXPMax("player")
     local rested = GetXPExhaustion()
     local isRestingString = ""
+
     if IsResting() then
-        isRestingString = GwLocalization["EXP_BAR_TOOLTIP_EXP_RESTING"]
+        isRestingString = L[" (Resting)"]
     end
 
     GameTooltip:AddLine(COMBAT_XP_GAIN .. isRestingString, 1, 1, 1)
 
-    if gw_reputation_vals ~= nil then
-        GameTooltip:AddLine(gw_reputation_vals, 1, 1, 1)
-    end
     if gw_honor_vals ~= nil then
         GameTooltip:AddLine(gw_honor_vals, 1, 1, 1)
     end
 
-    if UnitLevel("Player") < GetMaxPlayerLevel() then
+    if not IsPlayerAtEffectiveMaxLevel() then
         GameTooltip:AddLine(
-            COMBAT_XP_GAIN .." " ..
-                CommaValue(valCurrent) ..
-                    " / " .. CommaValue(valMax) .. " |cffa6a6a6 (" .. math.floor((valCurrent / valMax) * 100) .. "%)|r",
+            COMBAT_XP_GAIN ..
+                " " ..
+                    CommaValue(valCurrent) ..
+                        " / " ..
+                            CommaValue(valMax) .. " |cffa6a6a6 (" .. math.floor((valCurrent / valMax) * 100) .. "%)|r",
             1,
             1,
             1
@@ -73,7 +47,7 @@ local function xpbar_OnEnter()
 
     if rested ~= nil and rested ~= 0 then
         GameTooltip:AddLine(
-            GwLocalization["EXP_BAR_TOOLTIP_EXP_RESTED"] ..
+            L["Rested "] ..
                 CommaValue(rested) .. " |cffa6a6a6 (" .. math.floor((rested / valMax) * 100) .. "%) |r",
             1,
             1,
@@ -81,37 +55,26 @@ local function xpbar_OnEnter()
         )
     end
 
-    UIFrameFadeOut(GwExperienceFrameBar, 0.2, GwExperienceFrameBar:GetAlpha(), 0)
-    UIFrameFadeOut(_G["GwExperienceFrameArtifactBar"], 0.2, _G["GwExperienceFrameArtifactBar"]:GetAlpha(), 0)
+    if self.expBarShouldShow then
+        UIFrameFadeOut(self.ExpBar, 0.2, self.ExpBar:GetAlpha(), 0)
+    end
+    if self.azeritBarShouldShow then
+        UIFrameFadeOut(self.AzeritBar, 0.2, self.AzeritBar:GetAlpha(), 0)
+    end
+    if self.repuBarShouldShow then
+        UIFrameFadeOut(self.RepuBar, 0.2, self.RepuBar:GetAlpha(), 0)
+    end
 
-    local showArtifact = HasArtifactEquipped()
-    local disabledArtifact = C_ArtifactUI.IsEquippedArtifactDisabled()
     local azeriteItemLocation = C_AzeriteItem.FindActiveAzeriteItem()
+    local shouldShowAzeritBar = azeriteItemLocation and azeriteItemLocation:IsEquipmentSlot() and C_AzeriteItem.IsAzeriteItemEnabled(azeriteItemLocation)
 
-    if showArtifact and disabledArtifact == false then
-        local _, artifactXP, xpForNextPoint = artifactPoints()
-        local xpPct
-        if xpForNextPoint > 0 then
-            xpPct = math.floor((artifactXP / xpForNextPoint) * 100) .. "%"
-        else
-            xpPct = "n/a"
-        end
-
-        GameTooltip:AddLine(
-            ARTIFACT_POWER ..
-                " " ..
-                    CommaValue(artifactXP) .. " / " .. CommaValue(xpForNextPoint) .. " |cffa6a6a6 (" .. xpPct .. ")|r",
-            1,
-            1,
-            1
-        )
-    elseif azeriteItemLocation then
+    if shouldShowAzeritBar then
         local azeriteXP, xpForNextPoint = C_AzeriteItem.GetAzeriteItemXPInfo(azeriteItemLocation)
         local xpPct
         if xpForNextPoint > 0 then
             xpPct = math.floor((azeriteXP / xpForNextPoint) * 100) .. "%"
         else
-            xpPct = "n/a"
+            xpPct = NOT_APPLICABLE
         end
         GameTooltip:AddLine(
             AZERITE_POWER_BAR:format(
@@ -123,27 +86,36 @@ local function xpbar_OnEnter()
         )
     end
 
+    if gw_reputation_vals ~= nil then
+        GameTooltip:AddLine(gw_reputation_vals, 1, 1, 1)
+    end
+
     GameTooltip:Show()
 end
 GW.AddForProfiling("hud", "xpbar_OnEnter", xpbar_OnEnter)
 
 local function xpbar_OnClick()
-    if HasArtifactEquipped() and C_ArtifactUI.IsEquippedArtifactDisabled() == false then
-        SocketInventoryItem(16)
-    else
-        if UnitLevel("Player") < GetMaxPlayerLevel("Player") then
-            if GwLevelingRewards:IsShown() then
-                GwLevelingRewards:Hide()
+    if not IsPlayerAtEffectiveMaxLevel() then
+        if GwLevelingRewards:IsShown() then
+            GwLevelingRewards:Hide()
+        else
+            GwLevelingRewards:Show()
+        end
+    elseif C_AzeriteEmpoweredItem.IsHeartOfAzerothEquipped() then
+        local heartItemLocation = C_AzeriteItem.FindActiveAzeriteItem()
+        if heartItemLocation and heartItemLocation:IsEqualTo(ItemLocation:CreateFromEquipmentSlot(2)) then
+            if AzeriteEssenceUI and AzeriteEssenceUI:IsShown() then
+                HideUIPanel(AzeriteEssenceUI)
             else
-                GwLevelingRewards:Show()
+                OpenAzeriteEssenceUIFromItemLocation(heartItemLocation)
             end
         end
     end
 end
 GW.AddForProfiling("hud", "xpbar_OnClick", xpbar_OnClick)
 
-local function flareAnim()
-    GwXpFlare:Show()
+local function flareAnim(self)
+    self.barOverlay.flare:Show()
 
     AddToAnimation(
         "GwXpFlare",
@@ -152,286 +124,198 @@ local function flareAnim()
         GetTime(),
         1,
         function(prog)
-            GwXpFlare.texture:SetAlpha(1)
-            GwXpFlare.texture:SetRotation(lerp(0, 3, prog))
+            self.barOverlay.flare.texture:SetAlpha(1)
+            self.barOverlay.flare.texture:SetRotation(lerp(0, 3, prog))
             if prog > 0.75 then
-                GwXpFlare.texture:SetAlpha(lerp(1, 0, math.sin(((prog - 0.75) / 0.25) * math.pi * 0.5)))
+                self.barOverlay.flare.texture:SetAlpha(lerp(1, 0, math.sin(((prog - 0.75) / 0.25) * math.pi * 0.5)))
             end
         end,
         nil,
         function()
-            GwXpFlare:Hide()
+            self.barOverlay.flare:Hide()
         end
     )
 end
 GW.AddForProfiling("hud", "flareAnim", flareAnim)
 
 local function xpbar_OnEvent(self, event)
-    if event == "CHAT_MSG_COMBAT_HONOR_GAIN" and UnitInBattleground("player") ~= nil then
-        local delayUpdateTime = GetTime() + 0.4
-        GwExperienceFrame:SetScript(
-            "OnUpdate",
-            function()
-                if GetTime() < delayUpdateTime then
-                    return
-                end
-                xpbar_OnEvent(self, nil)
-                GwExperienceFrame:SetScript("OnUpdate", nil)
-            end
-        )
-    end
     if event == "UPDATE_FACTION" and not GW.inWorld then
         return
     end
 
-    displayRewards()
-
-    local showArtifact = HasArtifactEquipped()
-    local disabledArtifact = C_ArtifactUI.IsEquippedArtifactDisabled()
     local azeriteItemLocation = C_AzeriteItem.FindActiveAzeriteItem()
-    local artifactVal = 0
-    local numPoints = 0
-    local artifactXP = 0
-    local azeriteXP = 0
-    local xpForNextPoint = 0
+    local shouldShowAzeritBar = azeriteItemLocation and azeriteItemLocation:IsEquipmentSlot() and C_AzeriteItem.IsAzeriteItemEnabled(azeriteItemLocation)
+    local AzeritVal = 0
+    local AzeritLevel = 0
 
     local valCurrent = UnitXP("Player")
     local valMax = UnitXPMax("Player")
     local valPrec = valCurrent / valMax
+    local valPrecRepu = 0
 
-    local level = UnitLevel("Player")
-    local Nextlevel = math.min(GetMaxPlayerLevel(), UnitLevel("Player") + 1)
+    local level = GW.mylevel
+    local maxPlayerLevel = GetMaxLevelForPlayerExpansion()
+    local Nextlevel = math.min(maxPlayerLevel, level + 1)
+    local lockLevelTextUnderMaxLevel = level < Nextlevel
 
     local rested = GetXPExhaustion()
-    local showBar1 = false
+    local showBar1 = level < Nextlevel
     local showBar2 = false
-    local restingIconString = " |TInterface\\AddOns\\GW2_UI\\textures\\resting-icon:16:16:0:0|t "
+    local showBar3 = false
+    local restingIconString = IsResting() and " |TInterface\\AddOns\\GW2_UI\\textures\\icons\\resting-icon:16:16:0:0|t " or ""
 
-    if not IsResting() then
-        restingIconString = ""
-    end
     if rested == nil or (rested / valMax) == 0 then
         rested = 0
     else
-        rested = rested / (valMax - valCurrent)
-    end
-    if rested > 1 then
-        rested = 1
-    end
-
-    if level < Nextlevel then
-        showBar1 = true
+        rested = math.min((rested / (valMax - valCurrent)), 1)
     end
 
     local animationSpeed = 15
 
-    _G["GwExperienceFrameBar"]:SetStatusBarColor(0.83, 0.57, 0)
+    self.ExpBar:SetStatusBarColor(0.83, 0.57, 0)
 
     gw_reputation_vals = nil
-    local name, description, standingId, bottomValue, topValue, earnedValue, atWarWith, canToggleAtWar, isHeader, isCollapsed, hasRep, isWatched, isChild
-    if level == Nextlevel then
-        for factionIndex = 1, GetNumFactions() do
-            name,
-                description,
-                standingId,
-                bottomValue,
-                topValue,
-                earnedValue,
-                atWarWith,
-                canToggleAtWar,
-                isHeader,
-                isCollapsed,
-                hasRep,
-                isWatched,
-                isChild = GetFactionInfo(factionIndex)
-            if isWatched == true then
-                local name, reaction, _, _, _, factionID = GetWatchedFactionInfo()
-                local friendID, friendRep, friendMaxRep, friendName, _, _, _, friendThreshold, nextFriendThreshold =
-                    GetFriendshipReputation(factionID)
-                if C_Reputation.IsFactionParagon(factionID) then
-                    local currentValue, maxValueParagon = C_Reputation.GetFactionParagonInfo(factionID)
 
-                    if currentValue > 10000 then
-                        repeat
-                            currentValue = currentValue - 10000
-                        until (currentValue < 10000)
-                    end
-                    valPrec = (currentValue - 0) / (maxValueParagon - 0)
-                    gw_reputation_vals =
-                        name ..
-                            " " .. REPUTATION .. " " ..
-                                CommaValue((currentValue - 0)) ..
-                                    " / " ..
-                                        CommaValue((maxValueParagon - 0)) ..
-                                            " |cffa6a6a6 (" .. math.floor(valPrec * 100) .. "%)|r",
-                        1,
-                        1,
-                        1
+    local watchedFactionData = C_Reputation.GetWatchedFactionData()
+    if watchedFactionData and watchedFactionData.factionID and watchedFactionData.factionID > 0 then
+        --local _, _, standingId, bottomValue, topValue, earnedValue = GetFactionInfoByID(watchedFactionData.factionID)
+        local friendReputationInfo = C_GossipInfo.GetFriendshipReputation(watchedFactionData.factionID)
+        local friendshipID = friendReputationInfo.friendshipFactionID
 
-                    _G["GwExperienceFrameBar"]:SetStatusBarColor(
-                        FACTION_BAR_COLORS[9].r,
-                        FACTION_BAR_COLORS[9].g,
-                        FACTION_BAR_COLORS[9].b
-                    )
-                elseif (friendID ~= nil) then
-                    if (nextFriendThreshold) then
-                        valPrec = (friendRep - friendThreshold) / (nextFriendThreshold - friendThreshold)
-                        gw_reputation_vals =
-                            friendName ..
-                                    " " .. REPUTATION .. " " ..
-                                    CommaValue((friendRep - friendThreshold)) ..
-                                        " / " ..
-                                            CommaValue((nextFriendThreshold - friendThreshold)) ..
-                                                " |cffa6a6a6 (" .. math.floor(valPrec * 100) .. "%)|r",
-                            1,
-                            1,
-                            1
-                    else
-                        valPrec = 1
-                        gw_reputation_vals =
-                            friendName ..
-                                    " " .. REPUTATION .. " " ..
-                                    CommaValue(friendMaxRep) ..
-                                        " / " ..
-                                            CommaValue(friendMaxRep) ..
-                                                " |cffa6a6a6 (" .. math.floor(valPrec * 100) .. "%)|r",
-                            1,
-                            1,
-                            1
-                    end
-                    _G["GwExperienceFrameBar"]:SetStatusBarColor(
-                        FACTION_BAR_COLORS[5].r,
-                        FACTION_BAR_COLORS[5].g,
-                        FACTION_BAR_COLORS[5].b
-                    )
-                else
-                    local currentRank =
-                        GetText("FACTION_STANDING_LABEL" .. math.min(8, math.max(1, standingId)), UnitSex("player"))
-                    local nextRank =
-                        GetText("FACTION_STANDING_LABEL" .. math.min(8, math.max(1, standingId + 1)), UnitSex("player"))
+        local isParagon = false
+        local isFriend = false
+        local isMajor = false
+        local isNormal = false
 
-                    if currentRank == nextRank and earnedValue - bottomValue == 0 then
-                        valPrec = 1
-                        gw_reputation_vals =
-                            name ..
-                                    " " .. REPUTATION .. " "  ..
-                                    "21,000 / 21,000 |cffa6a6a6 (" .. math.floor(valPrec * 100) .. "%)|r",
-                            1,
-                            1,
-                            1
-                    else
-                        valPrec = (earnedValue - bottomValue) / (topValue - bottomValue)
-                        gw_reputation_vals =
-                            name ..
-                                    " " .. REPUTATION .. " " ..
-                                    CommaValue((earnedValue - bottomValue)) ..
-                                        " / " ..
-                                            CommaValue((topValue - bottomValue)) ..
-                                                " |cffa6a6a6 (" .. math.floor(valPrec * 100) .. "%)|r",
-                            1,
-                            1,
-                            1
-                    end
-                    _G["GwExperienceFrameBar"]:SetStatusBarColor(
-                        FACTION_BAR_COLORS[reaction].r,
-                        FACTION_BAR_COLORS[reaction].g,
-                        FACTION_BAR_COLORS[reaction].b
-                    )
-                end
+        local MajorCurrentLevel = 0
+        local MajorNextLevel = 0
+        if C_Reputation.IsFactionParagon(watchedFactionData.factionID) then
+            local currentValue, maxValueParagon = C_Reputation.GetFactionParagonInfo(watchedFactionData.factionID)
 
-                local nextId = standingId + 1
-                if nextId == nil then
-                    nextId = standingId
-                end
-                level = getglobal("FACTION_STANDING_LABEL" .. standingId)
+            currentValue = currentValue % maxValueParagon;
+            valPrecRepu = (currentValue - 0) / (maxValueParagon - 0)
 
-                Nextlevel = getglobal("FACTION_STANDING_LABEL" .. nextId)
+            gw_reputation_vals = watchedFactionData.name .. " " .. REPUTATION .. " " .. CommaValue(currentValue - 0) .. " / " .. CommaValue(maxValueParagon - 0) .. " |cffa6a6a6 (" .. math.floor(valPrecRepu * 100) .. "%)|r"
 
-                showBar1 = true
+            self.RepuBar:SetStatusBarColor(FACTION_BAR_COLORS[9].r, FACTION_BAR_COLORS[9].g, FACTION_BAR_COLORS[9].b)
+            isParagon = true
+            isFriend = friendshipID > 0
+        elseif friendshipID > 0 then
+            if friendReputationInfo.nextThreshold then
+                valPrecRepu = (friendReputationInfo.standing - friendReputationInfo.reactionThreshold) / (friendReputationInfo.nextThreshold - friendReputationInfo.reactionThreshold)
+                gw_reputation_vals = friendReputationInfo.name .. " " .. REPUTATION .. " " .. CommaValue(friendReputationInfo.standing - friendReputationInfo.reactionThreshold) .. " / " .. CommaValue(friendReputationInfo.nextThreshold - friendReputationInfo.reactionThreshold) .. " |cffa6a6a6 (" .. math.floor(valPrecRepu * 100) .. "%)|r"
+            else
+                valPrecRepu = 1
+                gw_reputation_vals = friendReputationInfo.name .. " " .. REPUTATION .. " " .. CommaValue(friendReputationInfo.maxRep) .. " / " .. CommaValue(friendReputationInfo.maxRep) .. " |cffa6a6a6 (" .. math.floor(valPrecRepu * 100) .. "%)|r"
             end
+            self.RepuBar:SetStatusBarColor(FACTION_BAR_COLORS[5].r, FACTION_BAR_COLORS[5].g, FACTION_BAR_COLORS[5].b)
+            self.RepuBarCandy:SetStatusBarColor(FACTION_BAR_COLORS[5].r, FACTION_BAR_COLORS[5].g, FACTION_BAR_COLORS[5].b)
+            isFriend = true
+        elseif C_Reputation.IsMajorFaction(watchedFactionData.factionID) then
+            local majorFactionData = C_MajorFactions.GetMajorFactionData(watchedFactionData.factionID)
+
+            MajorCurrentLevel = majorFactionData.renownLevel
+            MajorNextLevel = C_MajorFactions.HasMaximumRenown(watchedFactionData.factionID) and MajorCurrentLevel or MajorCurrentLevel + 1
+
+            if C_MajorFactions.HasMaximumRenown(watchedFactionData.factionID) then
+                valPrecRepu = 1
+            else
+                valPrecRepu = ((majorFactionData.renownReputationEarned or 0)) / majorFactionData.renownLevelThreshold
+            end
+            gw_reputation_vals = watchedFactionData.name .. " " .. REPUTATION .. " " .. CommaValue((majorFactionData.renownReputationEarned or 0)) .. " / " .. CommaValue(majorFactionData.renownLevelThreshold) .. " |cffa6a6a6 (" .. math.floor(valPrecRepu * 100) .. "%)|r"
+
+            self.RepuBar:SetStatusBarColor(FACTION_BAR_COLORS[11].r, FACTION_BAR_COLORS[11].g, FACTION_BAR_COLORS[11].b)
+            self.RepuBarCandy:SetStatusBarColor(FACTION_BAR_COLORS[11].r, FACTION_BAR_COLORS[11].g, FACTION_BAR_COLORS[11].b)
+            isMajor = true
+        else
+            local currentRank = GetText("FACTION_STANDING_LABEL" .. min(8, max(1, (watchedFactionData.reaction or 1))), GW.mysex)
+            local nextRank = GetText("FACTION_STANDING_LABEL" .. min(8, max(1, (watchedFactionData.reaction or 1) + 1)), GW.mysex)
+
+            watchedFactionData.currentStanding = watchedFactionData.currentStanding or 0 --fallback
+            watchedFactionData.nextReactionThreshold = watchedFactionData.nextReactionThreshold or 0 --fallback
+            watchedFactionData.currentReactionThreshold = watchedFactionData.currentReactionThreshold or 0 --fallback
+            if currentRank == nextRank and watchedFactionData.currentStanding - watchedFactionData.currentReactionThreshold == 0 then
+                valPrecRepu = 1
+                gw_reputation_vals = watchedFactionData.name .. " " .. REPUTATION .. " 21,000 / 21,000 |cffa6a6a6 (" .. math.floor(valPrecRepu * 100) .. "%)|r"
+            else
+                valPrecRepu = (watchedFactionData.currentStanding - watchedFactionData.currentReactionThreshold) / (watchedFactionData.nextReactionThreshold - watchedFactionData.currentReactionThreshold)
+                gw_reputation_vals = watchedFactionData.name .. " " .. REPUTATION .. " " .. CommaValue((watchedFactionData.currentStanding - watchedFactionData.currentReactionThreshold)) .. " / " .. CommaValue((watchedFactionData.nextReactionThreshold - watchedFactionData.currentReactionThreshold)) .. " |cffa6a6a6 (" .. math.floor(valPrecRepu * 100) .. "%)|r"
+            end
+            self.RepuBar:SetStatusBarColor(FACTION_BAR_COLORS[watchedFactionData.reaction].r, FACTION_BAR_COLORS[watchedFactionData.reaction].g, FACTION_BAR_COLORS[watchedFactionData.reaction].b)
+            self.RepuBarCandy:SetStatusBarColor(FACTION_BAR_COLORS[watchedFactionData.reaction].r, FACTION_BAR_COLORS[watchedFactionData.reaction].g, FACTION_BAR_COLORS[watchedFactionData.reaction].b)
+            isNormal = true
         end
+
+        local nextId = watchedFactionData.reaction and watchedFactionData.reaction + 1 or 1 --standingId
+        if not lockLevelTextUnderMaxLevel then
+            level = isMajor and MajorCurrentLevel or isFriend and friendReputationInfo.reaction or isParagon and getglobal("FACTION_STANDING_LABEL" .. (watchedFactionData.reaction or 1)) or isNormal and getglobal("FACTION_STANDING_LABEL" .. (watchedFactionData.reaction or 1))
+            Nextlevel = isParagon and L["Paragon"] or isFriend and "" or isMajor and MajorNextLevel or isNormal and getglobal("FACTION_STANDING_LABEL" .. math.min(8, nextId))
+        end
+
+        showBar3 = true
     end
 
-    if showArtifact and disabledArtifact == false then
+    if shouldShowAzeritBar then
         showBar2 = true
-        numPoints, artifactXP, xpForNextPoint = artifactPoints()
+        local azeriteXP, xpForNextPoint = C_AzeriteItem.GetAzeriteItemXPInfo(azeriteItemLocation)
+        AzeritLevel = C_AzeriteItem.GetPowerLevel(azeriteItemLocation)
 
         if xpForNextPoint > 0 then
-            artifactVal = artifactXP / xpForNextPoint
+            AzeritVal = azeriteXP / xpForNextPoint
         else
-            artifactVal = 0
+            AzeritVal = 0
         end
-    elseif azeriteItemLocation then
-        showBar2 = true
-        azeriteXP, xpForNextPoint = C_AzeriteItem.GetAzeriteItemXPInfo(azeriteItemLocation)
-        numPoints = C_AzeriteItem.GetPowerLevel(azeriteItemLocation)
-
-        if xpForNextPoint > 0 then
-            artifactVal = azeriteXP / xpForNextPoint
-        else
-            artifactVal = 0
-        end
-        _G["GwExperienceFrameArtifactBar"]:SetStatusBarColor(
+        self.AzeritBar:SetStatusBarColor(
             FACTION_BAR_COLORS[10].r,
             FACTION_BAR_COLORS[10].g,
             FACTION_BAR_COLORS[10].b
         )
-        _G["GwExperienceFrameArtifactBar"].animation:Show()
+        self.AzeritBar.animation:Show()
     end
 
     if showBar2 then
-        _G["GwExperienceFrameArtifactBarCandy"]:SetValue(artifactVal)
+        self.AzeritBarCandy:SetValue(AzeritVal)
 
         AddToAnimation(
-            "artifactBarAnimation",
-            _G["GwExperienceFrameArtifactBar"].artifactBarAnimation,
-            artifactVal,
+            "AzeritBarAnimation",
+            self.AzeritBar.AzeritBarAnimation,
+            AzeritVal,
             GetTime(),
             animationSpeed,
-            function()
-                ArtifactBarSpark:SetWidth(
+            function(p)
+                self.AzeritBar.Spark:SetWidth(
                     math.max(
                         8,
-                        math.min(
-                            9,
-                            _G["GwExperienceFrameArtifactBar"]:GetWidth() *
-                                animations["artifactBarAnimation"]["progress"]
-                        )
+                        math.min(9, self.AzeritBar:GetWidth() * p)
                     )
                 )
 
-                _G["GwExperienceFrameArtifactBar"]:SetValue(animations["artifactBarAnimation"]["progress"])
-                ArtifactBarSpark:SetPoint(
-                    "LEFT",
-                    _G["GwExperienceFrameArtifactBar"]:GetWidth() * animations["artifactBarAnimation"]["progress"] - 8,
-                    0
-                )
+                self.AzeritBar:SetValue(p)
+                self.AzeritBar.Spark:SetPoint("LEFT", self.AzeritBar:GetWidth() * p - 8, 0)
             end
         )
-        _G["GwExperienceFrameArtifactBar"].artifactBarAnimation = artifactVal
+        self.AzeritBar.AzeritBarAnimation = AzeritVal
 
-        if GetMaxPlayerLevel() == UnitLevel("player") then
-            level = numPoints
-            Nextlevel = numPoints + 1
-            _G["GwExperienceFrameNextLevel"]:SetTextColor(240 / 255, 189 / 255, 103 / 255)
-            _G["GwExperienceFrameCurrentLevel"]:SetTextColor(240 / 255, 189 / 255, 103 / 255)
-            GwExperienceFrame.labelRight:SetTexture("Interface\\AddOns\\GW2_UI\\textures\\level-label-artifact")
-            GwExperienceFrame.labelLeft:SetTexture("Interface\\AddOns\\GW2_UI\\textures\\level-label-artifact")
+        if maxPlayerLevel == GW.mylevel then
+            level = AzeritLevel
+            Nextlevel = AzeritLevel + 1 --Max azerit level is infinity
+            self.NextLevel:SetTextColor(240 / 255, 189 / 255, 103 / 255)
+            self.CurrentLevel:SetTextColor(240 / 255, 189 / 255, 103 / 255)
+            self.labelRight:SetTexture("Interface/AddOns/GW2_UI/textures/hud/level-label-azerit")
+            self.labelLeft:SetTexture("Interface/AddOns/GW2_UI/textures/hud/level-label-azerit")
         end
     else
-        _G["GwExperienceFrameNextLevel"]:SetTextColor(1, 1, 1)
-        _G["GwExperienceFrameCurrentLevel"]:SetText(1, 1, 1)
-        GwExperienceFrame.labelRight:SetTexture("Interface\\AddOns\\GW2_UI\\textures\\level-label")
-        GwExperienceFrame.labelLeft:SetTexture("Interface\\AddOns\\GW2_UI\\textures\\level-label")
+        local texture = (maxPlayerLevel == GW.mylevel) and "Interface/AddOns/GW2_UI/textures/hud/level-label-azerit" or "Interface/AddOns/GW2_UI/textures/hud/level-label"
+        self.NextLevel:SetTextColor(1, 1, 1)
+        self.CurrentLevel:SetTextColor(1, 1, 1)
+        self.labelRight:SetTexture(texture)
+        self.labelLeft:SetTexture(texture)
     end
 
     --If we are inside a pvp arena we show the honorbar
     gw_honor_vals = nil
 
-    if
-        (UnitLevel("player") == GetMaxPlayerLevel() and UnitInBattleground("player") ~= nil) or
-            (UnitLevel("player") == GetMaxPlayerLevel() and event == "PLAYER_ENTERING_BATTLEGROUND")
-     then
+    if (GW.mylevel == maxPlayerLevel and (UnitInBattleground("player") ~= nil or event == "PLAYER_ENTERING_BATTLEGROUND")) or IsWatchingHonorAsXP() then
         showBar1 = true
         level = UnitHonorLevel("player")
         Nextlevel = level + 1
@@ -441,172 +325,344 @@ local function xpbar_OnEvent(self, event)
         valPrec = currentHonor / maxHonor
 
         gw_honor_vals =
-            HONOR .." " ..
-                CommaValue(currentHonor) ..
-                    " / " .. CommaValue(maxHonor) .. " |cffa6a6a6 (" .. math.floor(valPrec * 100) .. "%)|r",
-            1,
-            1,
-            1
-        _G["GwExperienceFrameBar"]:SetStatusBarColor(1, 0.2, 0.2)
+            HONOR ..
+                " " ..
+                    CommaValue(currentHonor) ..
+                        " / " .. CommaValue(maxHonor) .. " |cffa6a6a6 (" .. math.floor(valPrec * 100) .. "%)|r"
+            self.ExpBar:SetStatusBarColor(1, 0.2, 0.2)
     end
 
-    --  experiencebarAnimation = 0.01
-    --   valPrec = 0.8
+    if showBar1 then
+        local GainBigExp = false
+        local FlareBreakPoint = math.max(0.05, 0.15 * (1 - (GW.mylevel / maxPlayerLevel)))
+        if (valPrec - experiencebarAnimation) > FlareBreakPoint then
+            GainBigExp = true
+            flareAnim(self)
+        end
 
-    local GainBigExp = false
-    local FlareBreakPoint = math.max(0.05, 0.15 * (1 - (UnitLevel("Player") / GetMaxPlayerLevel())))
-    if (valPrec - experiencebarAnimation) > FlareBreakPoint then
-        GainBigExp = true
-        flareAnim()
-    end
+        if experiencebarAnimation > valPrec then
+            experiencebarAnimation = 0
+        end
 
-    if experiencebarAnimation > valPrec then
-        experiencebarAnimation = 0
-    end
+        self.barOverlay.flare.soundCooldown = 0
+        local expSoundCooldown = 0
+        local startTime = GetTime()
 
-    GwXpFlare.soundCooldown = 0
-    local expSoundCooldown = 0
-    local startTime = GetTime()
+        animationSpeed = Diff(experiencebarAnimation, valPrec)
+        animationSpeed = math.min(15, math.max(5, 10 * animationSpeed))
 
-    animationSpeed = Diff(experiencebarAnimation, valPrec)
-    animationSpeed = math.min(15, math.max(5, 10 * animationSpeed))
-
-    AddToAnimation(
-        "experiencebarAnimation",
-        experiencebarAnimation,
-        valPrec,
-        GetTime(),
-        animationSpeed,
-        function(step)
-            ExperienceBarSpark:SetWidth(
-                math.max(
-                    8,
-                    math.min(
-                        9,
-                        _G["GwExperienceFrameBar"]:GetWidth() * animations["experiencebarAnimation"]["progress"]
+        AddToAnimation(
+            "experiencebarAnimation",
+            experiencebarAnimation,
+            valPrec,
+            GetTime(),
+            animationSpeed,
+            function(step)
+                self.ExpBar.Spark:SetWidth(
+                    math.max(
+                        8,
+                        math.min(9,self.ExpBar:GetWidth() * step)
                     )
                 )
-            )
 
-            if not GainBigExp then
-                _G["GwExperienceFrameBar"]:SetValue(animations["experiencebarAnimation"]["progress"])
-                ExperienceBarSpark:SetPoint(
-                    "LEFT",
-                    _G["GwExperienceFrameBar"]:GetWidth() * animations["experiencebarAnimation"]["progress"] - 8,
-                    0
+                if not GainBigExp then
+                    self.ExpBar:SetValue(step)
+                    self.ExpBar.Spark:SetPoint("LEFT", self.ExpBar:GetWidth() * step - 8, 0)
+
+                    local flarePoint = ((UIParent:GetWidth() - 180) * step) + 90
+                    self.barOverlay.flare:SetPoint("CENTER", self, "LEFT", flarePoint, 0)
+                end
+                self.ExpBar.Rested:SetValue(rested)
+                self.ExpBar.Rested:SetPoint("LEFT", self.ExpBar, "LEFT", self.ExpBar:GetWidth() * step, 0)
+
+                if GainBigExp and self.barOverlay.flare.soundCooldown < GetTime() then
+                    expSoundCooldown =
+                        math.max(0.1, lerp(0.1, 2, math.sin((GetTime() - startTime) / animationSpeed) * math.pi * 0.5))
+
+                        self.ExpBar:SetValue(step)
+                        self.ExpBar.Spark:SetPoint(
+                        "LEFT",
+                        self.ExpBar:GetWidth() * step - 8,
+                        0
+                    )
+
+                    local flarePoint = ((UIParent:GetWidth() - 180) * step) + 90
+                    self.barOverlay.flare:SetPoint("CENTER", self, "LEFT", flarePoint, 0)
+
+                    self.barOverlay.flare.soundCooldown = GetTime() + expSoundCooldown
+                    PlaySoundFile("Interface\\AddOns\\GW2_UI\\sounds\\exp_gain_ping.ogg", "SFX")
+
+                    animations["experiencebarAnimation"].from = step
+                end
+            end
+        )
+        AddToAnimation(
+            "GwExperienceBarCandy",
+            experiencebarAnimation,
+            valPrec,
+            GetTime(),
+            0.3,
+            function(p)
+                self.ExpBarCandy:SetValue(p)
+            end
+        )
+    end
+
+    if showBar3 then
+        self.RepuBarCandy:SetValue(valPrecRepu)
+
+        AddToAnimation(
+            "repuBarAnimation",
+            self.RepuBar.repuBarAnimation,
+            valPrecRepu,
+            GetTime(),
+            animationSpeed,
+            function(p)
+                self.RepuBar.Spark:SetWidth(
+                    math.max(
+                        8,
+                        math.min(9, self.RepuBar:GetWidth() * p)
+                    )
                 )
 
-                local flarePoint = ((UIParent:GetWidth() - 180) * animations["experiencebarAnimation"]["progress"]) + 90
-                GwXpFlare:SetPoint("CENTER", GwExperienceFrame, "LEFT", flarePoint, 0)
+                self.RepuBar:SetValue(p)
+                self.RepuBar.Spark:SetPoint("LEFT", self.RepuBar:GetWidth() * p - 8, 0)
             end
-            _G["GwExperienceFrameBarRested"]:SetValue(rested)
-            _G["GwExperienceFrameBarRested"]:SetPoint(
-                "LEFT",
-                _G["GwExperienceFrameBar"],
-                "LEFT",
-                _G["GwExperienceFrameBar"]:GetWidth() * animations["experiencebarAnimation"]["progress"],
-                0
-            )
-
-            if GainBigExp and GwXpFlare.soundCooldown < GetTime() then
-                expSoundCooldown =
-                    math.max(0.1, lerp(0.1, 2, math.sin((GetTime() - startTime) / animationSpeed) * math.pi * 0.5))
-
-                _G["GwExperienceFrameBar"]:SetValue(animations["experiencebarAnimation"]["progress"])
-                ExperienceBarSpark:SetPoint(
-                    "LEFT",
-                    _G["GwExperienceFrameBar"]:GetWidth() * animations["experiencebarAnimation"]["progress"] - 8,
-                    0
-                )
-
-                local flarePoint = ((UIParent:GetWidth() - 180) * animations["experiencebarAnimation"]["progress"]) + 90
-                GwXpFlare:SetPoint("CENTER", GwExperienceFrame, "LEFT", flarePoint, 0)
-
-                GwXpFlare.soundCooldown = GetTime() + expSoundCooldown
-                PlaySoundFile("Interface\\AddOns\\GW2_UI\\sounds\\exp_gain_ping.ogg", "SFX")
-
-                animations["experiencebarAnimation"]["from"] = step
-            end
-        end
-    )
-    AddToAnimation(
-        "GwExperienceFrameBarCandy",
-        experiencebarAnimation,
-        valPrec,
-        GetTime(),
-        0.3,
-        function()
-            local prog = animations["GwExperienceFrameBarCandy"]["progress"]
-            _G["GwExperienceFrameBarCandy"]:SetValue(prog)
-        end
-    )
+        )
+        self.RepuBar.repuBarAnimation = valPrecRepu
+    end
 
     experiencebarAnimation = valPrec
 
-    if GW_LEVELING_REWARD_AVALIBLE then
-        Nextlevel = Nextlevel .. " |TInterface\\AddOns\\GW2_UI\\textures\\levelreward-icon:20:20:0:0|t"
+    if GW.IsUpcomingSpellAvalible() then
+        Nextlevel = Nextlevel and Nextlevel .. " |TInterface/AddOns/GW2_UI/textures/icons/levelreward-icon:20:20:0:0|t" or ""
     end
 
-    _G["GwExperienceFrameNextLevel"]:SetText(Nextlevel)
-    _G["GwExperienceFrameCurrentLevel"]:SetText(restingIconString .. level)
-    if showBar1 and showBar2 then
-        _G["GwExperienceFrameBar"]:Show()
-        _G["GwExperienceFrameBarCandy"]:Show()
-        _G["GwExperienceFrameBar"]:SetHeight(4)
-        _G["GwExperienceFrameBarCandy"]:SetHeight(4)
-        _G["ExperienceBarSpark"]:SetHeight(4)
-        ExperienceBarSpark:Show()
-        
-        _G["GwExperienceFrameArtifactBar"]:Show()
-        _G["GwExperienceFrameArtifactBarCandy"]:Show()
-        _G["GwExperienceFrameArtifactBarAnimation"]:Show()
-        _G["GwExperienceFrameArtifactBar"]:SetHeight(4)
-        _G["GwExperienceFrameArtifactBarAnimation"]:SetHeight(4)
-        _G["GwExperienceFrameArtifactBarCandy"]:SetHeight(4)
-        _G["ArtifactBarSpark"]:SetHeight(4)
-        ArtifactBarSpark:Show()
-    elseif not showBar1 and showBar2 then
-        _G["GwExperienceFrameBar"]:Hide()
-        _G["GwExperienceFrameBarCandy"]:Hide()
-        _G["GwExperienceFrameBar"]:SetValue(0)
-        _G["GwExperienceFrameBarCandy"]:SetValue(0)
-        ExperienceBarSpark:Hide()
+    if GW.mylevel ~= UnitEffectiveLevel("player") then
+        level = level .. " |cFF00FF00(" .. UnitEffectiveLevel("player") .. ")|r"
+    end
 
-        _G["GwExperienceFrameArtifactBar"]:Show()
-        _G["GwExperienceFrameArtifactBarCandy"]:Show()
-        _G["GwExperienceFrameArtifactBarAnimation"]:Show()
-        _G["GwExperienceFrameArtifactBar"]:SetHeight(8)
-        _G["GwExperienceFrameArtifactBarAnimation"]:SetHeight(8)
-        _G["GwExperienceFrameArtifactBarCandy"]:SetHeight(8)
-        _G["ArtifactBarSpark"]:SetHeight(4)
-        ArtifactBarSpark:Show()
-    elseif showBar1 and not showBar2 then
-        _G["GwExperienceFrameBar"]:Show()
-        _G["GwExperienceFrameBarCandy"]:Show()
-        _G["GwExperienceFrameBar"]:SetHeight(8)
-        _G["GwExperienceFrameBarCandy"]:SetHeight(8)
-        _G["ExperienceBarSpark"]:SetHeight(8)
-        ExperienceBarSpark:Show()
+    self.NextLevel:SetText(Nextlevel)
+    self.CurrentLevel:SetText(restingIconString .. level)
+    self.expBarShouldShow = showBar1
+    self.azeritBarShouldShow = showBar2
+    self.repuBarShouldShow = showBar3
+    if showBar1 and showBar2 and showBar3 then
+        self.ExpBar:Show()
+        self.ExpBarCandy:Show()
+        self.ExpBar:SetHeight(2.66)
+        self.ExpBarCandy:SetHeight(2.66)
+        self.ExpBar.Spark:SetHeight(2.66)
+        self.ExpBar.Spark:Show()
+        self.ExpBarCandy:SetPoint("TOPLEFT", 90, -4)
+        self.ExpBarCandy:SetPoint("TOPRIGHT", -90, -4)
+        self.ExpBar:SetPoint("TOPLEFT", 90, -4)
+        self.ExpBar:SetPoint("TOPRIGHT", -90, -4)
 
-        _G["GwExperienceFrameArtifactBar"]:Hide()
-        _G["GwExperienceFrameArtifactBarCandy"]:Hide()
-        _G["GwExperienceFrameArtifactBarAnimation"]:Hide()
-        _G["GwExperienceFrameArtifactBar"]:SetValue(0)
-        _G["GwExperienceFrameArtifactBarCandy"]:SetValue(0)
-        ArtifactBarSpark:Hide()
-    elseif not showBar1 and not showBar2 then 
-        _G["GwExperienceFrameBar"]:Hide()
-        _G["GwExperienceFrameBarCandy"]:Hide()
-        _G["GwExperienceFrameBar"]:SetValue(0)
-        _G["GwExperienceFrameBarCandy"]:SetValue(0)
-        ExperienceBarSpark:Hide()
+        self.AzeritBar:Show()
+        self.AzeritBarCandy:Show()
+        self.AzeritBar.animation:Show()
+        self.AzeritBar:SetHeight(2.66)
+        self.AzeritBar.animation:SetHeight(2.66)
+        self.AzeritBarCandy:SetHeight(2.66)
+        self.AzeritBar.Spark:SetHeight(2.66)
+        self.AzeritBar.Spark:Show()
+        self.AzeritBarCandy:SetPoint("TOPLEFT", 90, -8)
+        self.AzeritBarCandy:SetPoint("TOPRIGHT", -90, -8)
+        self.AzeritBar:SetPoint("TOPLEFT", 90, -8)
+        self.AzeritBar:SetPoint("TOPRIGHT", -90, -8)
 
-        _G["GwExperienceFrameArtifactBar"]:Hide()
-        _G["GwExperienceFrameArtifactBarCandy"]:Hide()
-        _G["GwExperienceFrameArtifactBarAnimation"]:Hide()
-        _G["GwExperienceFrameArtifactBar"]:SetValue(0)
-        _G["GwExperienceFrameArtifactBarCandy"]:SetValue(0)
-        ArtifactBarSpark:Hide()
+        self.RepuBar:Show()
+        self.RepuBarCandy:Show()
+        self.RepuBar:SetHeight(2.66)
+        self.RepuBarCandy:SetHeight(2.66)
+        self.RepuBar.Spark:SetHeight(2.66)
+        self.RepuBar.Spark:Show()
+        self.RepuBarCandy:SetPoint("TOPLEFT", 90, -12)
+        self.RepuBarCandy:SetPoint("TOPRIGHT", -90, -12)
+        self.RepuBar:SetPoint("TOPLEFT", 90, -12)
+        self.RepuBar:SetPoint("TOPRIGHT", -90, -12)
+    elseif showBar1 and not showBar2 and showBar3 then
+        self.ExpBar:Show()
+        self.ExpBarCandy:Show()
+        self.ExpBar:SetHeight(4)
+        self.ExpBarCandy:SetHeight(4)
+        self.ExpBar.Spark:SetHeight(4)
+        self.ExpBar.Spark:Show()
+        self.ExpBarCandy:SetPoint("TOPLEFT", 90, -4)
+        self.ExpBarCandy:SetPoint("TOPRIGHT", -90, -4)
+        self.ExpBar:SetPoint("TOPLEFT", 90, -4)
+        self.ExpBar:SetPoint("TOPRIGHT", -90, -4)
+
+        self.AzeritBar:Hide()
+        self.AzeritBarCandy:Hide()
+        self.AzeritBar.animation:Hide()
+        self.AzeritBar:SetValue(0)
+        self.AzeritBarCandy:SetValue(0)
+        self.AzeritBar.Spark:Hide()
+
+        self.RepuBar:Show()
+        self.RepuBarCandy:Show()
+        self.RepuBar:SetHeight(4)
+        self.RepuBarCandy:SetHeight(4)
+        self.RepuBar.Spark:SetHeight(4)
+        self.RepuBar.Spark:Show()
+        self.RepuBarCandy:SetPoint("TOPLEFT", 90, -8)
+        self.RepuBarCandy:SetPoint("TOPRIGHT", -90, -8)
+        self.RepuBar:SetPoint("TOPLEFT", 90, -8)
+        self.RepuBar:SetPoint("TOPRIGHT", -90, -8)
+    elseif not showBar1 and showBar2 and showBar3 then
+        self.ExpBar:Hide()
+        self.ExpBarCandy:Hide()
+        self.ExpBar:SetValue(0)
+        self.ExpBarCandy:SetValue(0)
+        self.ExpBar.Spark:Hide()
+
+        self.AzeritBar:Show()
+        self.AzeritBarCandy:Show()
+        self.AzeritBar.animation:Show()
+        self.AzeritBar:SetHeight(4)
+        self.AzeritBar.animation:SetHeight(4)
+        self.AzeritBarCandy:SetHeight(4)
+        self.AzeritBar.Spark:SetHeight(4)
+        self.AzeritBar.Spark:Show()
+        self.AzeritBarCandy:SetPoint("TOPLEFT", 90, -4)
+        self.AzeritBarCandy:SetPoint("TOPRIGHT", -90, -4)
+        self.AzeritBar:SetPoint("TOPLEFT", 90, -4)
+        self.AzeritBar:SetPoint("TOPRIGHT", -90, -4)
+
+        self.RepuBar:Show()
+        self.RepuBarCandy:Show()
+        self.RepuBar:SetHeight(4)
+        self.RepuBarCandy:SetHeight(4)
+        self.RepuBar.Spark:SetHeight(4)
+        self.RepuBar.Spark:Show()
+        self.RepuBarCandy:SetPoint("TOPLEFT", 90, -8)
+        self.RepuBarCandy:SetPoint("TOPRIGHT", -90, -8)
+        self.RepuBar:SetPoint("TOPLEFT", 90, -8)
+        self.RepuBar:SetPoint("TOPRIGHT", -90, -8)
+    elseif not showBar1 and not showBar2 and showBar3 then
+        self.ExpBar:Hide()
+        self.ExpBarCandy:Hide()
+        self.ExpBar:SetValue(0)
+        self.ExpBarCandy:SetValue(0)
+        self.ExpBar.Spark:Hide()
+
+        self.AzeritBar:Hide()
+        self.AzeritBarCandy:Hide()
+        self.AzeritBar.animation:Hide()
+        self.AzeritBar:SetValue(0)
+        self.AzeritBarCandy:SetValue(0)
+        self.AzeritBar.Spark:Hide()
+
+        self.RepuBar:Show()
+        self.RepuBarCandy:Show()
+        self.RepuBar:SetHeight(8)
+        self.RepuBarCandy:SetHeight(8)
+        self.RepuBar.Spark:SetHeight(8)
+        self.RepuBar.Spark:Show()
+        self.RepuBarCandy:SetPoint("TOPLEFT", 90, -4)
+        self.RepuBarCandy:SetPoint("TOPRIGHT", -90, -4)
+        self.RepuBar:SetPoint("TOPLEFT", 90, -4)
+        self.RepuBar:SetPoint("TOPRIGHT", -90, -4)
+    elseif not showBar1 and not showBar2 and not showBar3 then
+        self.ExpBar:Hide()
+        self.ExpBarCandy:Hide()
+        self.ExpBar:SetValue(0)
+        self.ExpBarCandy:SetValue(0)
+        self.ExpBar.Spark:Hide()
+
+        self.AzeritBar:Hide()
+        self.AzeritBarCandy:Hide()
+        self.AzeritBar.animation:Hide()
+        self.AzeritBar:SetValue(0)
+        self.AzeritBarCandy:SetValue(0)
+        self.AzeritBar.Spark:Hide()
+
+        self.RepuBar:Hide()
+        self.RepuBarCandy:Hide()
+        self.RepuBar:SetValue(0)
+        self.RepuBarCandy:SetValue(0)
+        self.RepuBar.Spark:Hide()
+    elseif showBar1 and not showBar2 and not showBar3 then
+        self.ExpBar:Show()
+        self.ExpBarCandy:Show()
+        self.ExpBar:SetHeight(8)
+        self.ExpBarCandy:SetHeight(8)
+        self.ExpBar.Spark:SetHeight(8)
+        self.ExpBar.Spark:Show()
+        self.ExpBarCandy:SetPoint("TOPLEFT", 90, -4)
+        self.ExpBarCandy:SetPoint("TOPRIGHT", -90, -4)
+        self.ExpBar:SetPoint("TOPLEFT", 90, -4)
+        self.ExpBar:SetPoint("TOPRIGHT", -90, -4)
+
+        self.AzeritBar:Hide()
+        self.AzeritBarCandy:Hide()
+        self.AzeritBar.animation:Hide()
+        self.AzeritBar:SetValue(0)
+        self.AzeritBarCandy:SetValue(0)
+        self.AzeritBar.Spark:Hide()
+
+        self.RepuBar:Hide()
+        self.RepuBarCandy:Hide()
+        self.RepuBar:SetValue(0)
+        self.RepuBarCandy:SetValue(0)
+        self.RepuBar.Spark:Hide()
+    elseif showBar1 and showBar2 and not showBar3 then
+        self.ExpBar:Show()
+        self.ExpBarCandy:Show()
+        self.ExpBar:SetHeight(4)
+        self.ExpBarCandy:SetHeight(4)
+        self.ExpBar.Spark:SetHeight(4)
+        self.ExpBar.Spark:Show()
+        self.ExpBarCandy:SetPoint("TOPLEFT", 90, -4)
+        self.ExpBarCandy:SetPoint("TOPRIGHT", -90, -4)
+        self.ExpBar:SetPoint("TOPLEFT", 90, -4)
+        self.ExpBar:SetPoint("TOPRIGHT", -90, -4)
+
+        self.AzeritBar:Show()
+        self.AzeritBarCandy:Show()
+        self.AzeritBar.animation:Show()
+        self.AzeritBar:SetHeight(4)
+        self.AzeritBar.animation:SetHeight(4)
+        self.AzeritBarCandy:SetHeight(4)
+        self.AzeritBar.Spark:SetHeight(4)
+        self.AzeritBar.Spark:Show()
+        self.AzeritBarCandy:SetPoint("TOPLEFT", 90, -8)
+        self.AzeritBarCandy:SetPoint("TOPRIGHT", -90, -8)
+        self.AzeritBar:SetPoint("TOPLEFT", 90, -8)
+        self.AzeritBar:SetPoint("TOPRIGHT", -90, -8)
+
+        self.RepuBar:Hide()
+        self.RepuBarCandy:Hide()
+        self.RepuBar:SetValue(0)
+        self.RepuBarCandy:SetValue(0)
+        self.RepuBar.Spark:Hide()
+    elseif not showBar1 and showBar2 and not showBar3 then
+        self.ExpBar:Hide()
+        self.ExpBarCandy:Hide()
+        self.ExpBar:SetValue(0)
+        self.ExpBarCandy:SetValue(0)
+        self.ExpBar.Spark:Hide()
+
+        self.AzeritBar:Show()
+        self.AzeritBarCandy:Show()
+        self.AzeritBar.animation:Show()
+        self.AzeritBar:SetHeight(8)
+        self.AzeritBar.animation:SetHeight(8)
+        self.AzeritBarCandy:SetHeight(8)
+        self.AzeritBar.Spark:SetHeight(8)
+        self.AzeritBar.Spark:Show()
+        self.AzeritBarCandy:SetPoint("TOPLEFT", 90, -4)
+        self.AzeritBarCandy:SetPoint("TOPRIGHT", -90, -4)
+        self.AzeritBar:SetPoint("TOPLEFT", 90, -4)
+        self.AzeritBar:SetPoint("TOPRIGHT", -90, -4)
+
+        self.RepuBar:Hide()
+        self.RepuBarCandy:Hide()
+        self.RepuBar:SetValue(0)
+        self.RepuBarCandy:SetValue(0)
+        self.RepuBar.Spark:Hide()
     end
 
     if experiencebarAnimation > valPrec then
@@ -616,21 +672,15 @@ end
 GW.AddForProfiling("hud", "xpbar_OnEvent", xpbar_OnEvent)
 
 local function animateAzeriteBar(self, elapsed)
-    self:SetPoint(
-        "RIGHT",
-        ArtifactBarSpark,
-        'RIGHT',
-        0,
-        0
-    )
+    self:SetPoint("RIGHT", self:GetParent():GetParent().AzeritBar.Spark, "RIGHT", 0, 0)
     local speed = 0.01
     self.prog = self.prog + (speed * elapsed)
     if self.prog > 1 then
         self.prog = 0
     end
-    
-    self.texture1:SetTexCoord(0 , _G["GwExperienceFrameArtifactBar"]:GetValue(), 0, 1)
-    self.texture2:SetTexCoord(_G["GwExperienceFrameArtifactBar"]:GetValue(), 0, 1, 0)
+
+    self.texture1:SetTexCoord(0, self:GetParent():GetParent().AzeritBar:GetValue(), 0, 1)
+    self.texture2:SetTexCoord(self:GetParent():GetParent().AzeritBar:GetValue(), 0, 1, 0)
 
     if self.prog < 0.2 then
         self.texture2:SetVertexColor(1, 1, 1, lerp(0, 1, self.prog / 0.2))
@@ -640,1230 +690,338 @@ local function animateAzeriteBar(self, elapsed)
     if self.prog > 0.5 then
         self.texture1:SetVertexColor(1, 1, 1, lerp(0.3, 0, (self.prog - 0.5) / 0.5))
     elseif self.prog < 0.5 then
-        self.texture1:SetVertexColor(1, 1, 1, lerp(0,0.3, self.prog / 0.5 ))
+        self.texture1:SetVertexColor(1, 1, 1, lerp(0, 0.3, self.prog / 0.5))
     end
-    self.texture2:SetTexCoord(1 - self.prog, self.prog, 1, 0)  
+    self.texture2:SetTexCoord(1 - self.prog, self.prog, 1, 0)
 end
 GW.AddForProfiling("hud", "animateAzeriteBar", animateAzeriteBar)
 
-local function updateBarSize()
+local function updateBarSize(self)
     local m = (UIParent:GetWidth() - 180) / 10
-    for i = 1, 9 do
+    local i = 1
+    for _, v in ipairs(self.barOverlay.barSep) do
         local rm = (m * i) + 90
-        _G["barsep" .. i]:ClearAllPoints()
-        _G["barsep" .. i]:SetPoint("LEFT", "GwExperienceFrame", "LEFT", rm, 0)
+        v:ClearAllPoints()
+        v:SetPoint("LEFT", self, "LEFT", rm, 0)
+        i = i + 1
     end
 
     m = (UIParent:GetWidth() - 180)
-    dubbleBarSep:SetWidth(m)
-    dubbleBarSep:ClearAllPoints()
-    dubbleBarSep:SetPoint("LEFT", "GwExperienceFrame", "LEFT", 90, 0)
+    self.barOverlay.dubbleBarSep:SetWidth(m)
+    self.barOverlay.dubbleBarSep:ClearAllPoints()
+    self.barOverlay.dubbleBarSep:SetPoint("LEFT", self, "LEFT", 90, 0)
 end
 GW.AddForProfiling("hud", "updateBarSize", updateBarSize)
 
-local action_hud_auras = {}
+local actionHudPlayerAuras = {}
+local actionHudPlayerPetAuras = {}
 
-local function registerActionHudAura(aura, left, right)
-    action_hud_auras[aura] = {}
-    action_hud_auras[aura]["aura"] = aura
-    action_hud_auras[aura]["left"] = left
-    action_hud_auras[aura]["right"] = right
+local function registerActionHudAura(auraID, left, right, unit)
+    if unit == "player" then
+        actionHudPlayerAuras[auraID] = {}
+        actionHudPlayerAuras[auraID].auraID = auraID
+        actionHudPlayerAuras[auraID].left = left
+        actionHudPlayerAuras[auraID].right = right
+        actionHudPlayerAuras[auraID].unit = unit
+    elseif unit == "pet" then
+        actionHudPlayerPetAuras[auraID] = {}
+        actionHudPlayerPetAuras[auraID].auraID = auraID
+        actionHudPlayerPetAuras[auraID].left = left
+        actionHudPlayerPetAuras[auraID].right = right
+        actionHudPlayerPetAuras[auraID].unit = unit
+    end
 end
-local currentTexture = nil
 GW.AddForProfiling("hud", "registerActionHudAura", registerActionHudAura)
 
---[[
-local function getSpecSpecificHud(left, right)
-    --hard coded for now
-    local playerClassName, playerClassEng, playerClass = UnitClass("player")
-    if playerClass == 6 and GetSpecialization() == 3 then
-        right = "Interface\\AddOns\\GW2_UI\\textures\\rightshadow_unholy"
-        left = "Interface\\AddOns\\GW2_UI\\textures\\leftshadow_unholy"
-    elseif playerClass == 6 and GetSpecialization() == 2 then
-        right = "Interface\\AddOns\\GW2_UI\\textures\\rightshadow_frost"
-        left = "Interface\\AddOns\\GW2_UI\\textures\\leftshadow_frost"
-    end
+local currentTexture = nil
 
-    return left, right
-end
---]]
-local function selectBg()
-    if not GetSetting("HUD_SPELL_SWAP") then
+local function selectBg(self)
+    if not GW.settings.HUD_BACKGROUND or not GW.settings.HUD_SPELL_SWAP then
         return
     end
-    local right = "Interface\\AddOns\\GW2_UI\\textures\\rightshadow"
-    local left = "Interface\\AddOns\\GW2_UI\\textures\\leftshadow"
+
+    local right = "Interface/AddOns/GW2_UI/textures/hud/rightshadow"
+    local left = "Interface/AddOns/GW2_UI/textures/hud/leftshadow"
 
     if UnitIsDeadOrGhost("player") then
-        right = "Interface\\AddOns\\GW2_UI\\textures\\rightshadow_dead"
-        left = "Interface\\AddOns\\GW2_UI\\textures\\leftshadow_dead"
+        right = "Interface/AddOns/GW2_UI/textures/hud/rightshadow_dead"
+        left = "Interface/AddOns/GW2_UI/textures/hud/leftshadow_dead"
+    end
+
+    if GW.myClassID == 11 then --Druid
+        local ShapeshiftFormID = GetShapeshiftFormID()
+        if ShapeshiftFormID == BEAR_FORM then
+            right = "Interface/AddOns/GW2_UI/textures/hud/rightshadow_bear"
+            left = "Interface/AddOns/GW2_UI/textures/hud/leftshadow_bear"
+        elseif ShapeshiftFormID == CAT_FORM then
+            right = "Interface/AddOns/GW2_UI/textures/hud/rightshadow_cat"
+            left = "Interface/AddOns/GW2_UI/textures/hud/leftshadow_cat"
+        end
+    end
+
+    if GW.Libs.GW2Lib:IsPlayerDragonRiding() then
+        right = "Interface/AddOns/GW2_UI/textures/hud/rightshadow-dragon"
+        left = "Interface/AddOns/GW2_UI/textures/hud/leftshadow-dragon"
     end
 
     if UnitAffectingCombat("player") then
-        right = "Interface\\AddOns\\GW2_UI\\textures\\rightshadowcombat"
-        left = "Interface\\AddOns\\GW2_UI\\textures\\leftshadowcombat"
+        right = "Interface/AddOns/GW2_UI/textures/hud/rightshadowcombat"
+        left = "Interface/AddOns/GW2_UI/textures/hud/leftshadowcombat"
 
-        for i = 1, 40 do
-            local _, _, _, _, _, _, _, _, _, spellID = UnitBuff("player", i)
-            if spellID ~= nil and action_hud_auras[spellID] ~= nil then
-                left = action_hud_auras[spellID]["left"]
-                right = action_hud_auras[spellID]["right"]
+        local bolFound = false
+        --player buffs
+        for k, v in pairs(actionHudPlayerAuras) do
+            local auraData = C_UnitAuras.GetPlayerAuraBySpellID(k)
+            if auraData then
+                right = v.right
+                left = v.left
+                bolFound = true
+                break
+            end
+        end
+        -- pet buffs
+        if not bolFound then
+            for i = 1, 40 do
+                local auraData = C_UnitAuras.GetBuffDataByIndex("pet", i)
+                if auraData and actionHudPlayerPetAuras[auraData.spellId] and actionHudPlayerPetAuras[auraData.spellId].unit == "pet" then
+                    right = actionHudPlayerPetAuras[auraData.spellId].right
+                    left = actionHudPlayerPetAuras[auraData.spellId].left
+                    break
+                end
             end
         end
     end
 
     if currentTexture ~= left then
         currentTexture = left
-        _G["GwActionBarHudLEFT"]:SetTexture(left)
-        _G["GwActionBarHudRIGHT"]:SetTexture(right)
+        self.actionBarHud.Right:SetTexture(right)
+        self.actionBarHud.Left:SetTexture(left)
     end
 end
 GW.AddForProfiling("hud", "selectBg", selectBg)
 
-local function combatHealthState()
+local function combatHealthState(self)
+    if not GW.settings.HUD_BACKGROUND then
+        return
+    end
+
     local unitHealthPrecentage = UnitHealth("player") / UnitHealthMax("player")
 
     if unitHealthPrecentage < 0.5 and not UnitIsDeadOrGhost("player") then
         unitHealthPrecentage = unitHealthPrecentage / 0.5
+        local alpha = 1 - unitHealthPrecentage - 0.2
+        if alpha < 0 then alpha = 0 end
+        if alpha > 1 then alpha = 1 end
 
-        _G["GwActionBarHudLEFT"]:SetVertexColor(1, unitHealthPrecentage, unitHealthPrecentage)
-        _G["GwActionBarHudRIGHT"]:SetVertexColor(1, unitHealthPrecentage, unitHealthPrecentage)
+        self.actionBarHud.Left:SetVertexColor(1, unitHealthPrecentage, unitHealthPrecentage)
+        self.actionBarHud.Right:SetVertexColor(1, unitHealthPrecentage, unitHealthPrecentage)
 
-        _G["GwActionBarHudRIGHTSWIM"]:SetVertexColor(1, unitHealthPrecentage, unitHealthPrecentage)
-        _G["GwActionBarHudLEFTSWIM"]:SetVertexColor(1, unitHealthPrecentage, unitHealthPrecentage)
+        self.actionBarHud.RightSwim:SetVertexColor(1, unitHealthPrecentage, unitHealthPrecentage)
+        self.actionBarHud.LeftSwim:SetVertexColor(1, unitHealthPrecentage, unitHealthPrecentage)
 
-        _G["GwActionBarHudLEFTBLOOD"]:SetVertexColor(1, 1, 1, 1 - (unitHealthPrecentage - 0.2))
-        _G["GwActionBarHudRIGHTBLOOD"]:SetVertexColor(1, 1, 1, 1 - (unitHealthPrecentage - 0.2))
+        self.actionBarHud.LeftBlood:SetVertexColor(1, 1, 1, alpha)
+        self.actionBarHud.RightBlood:SetVertexColor(1, 1, 1, alpha)
     else
-        _G["GwActionBarHudLEFT"]:SetVertexColor(1, 1, 1)
-        _G["GwActionBarHudRIGHT"]:SetVertexColor(1, 1, 1)
+        self.actionBarHud.Left:SetVertexColor(1, 1, 1)
+        self.actionBarHud.Right:SetVertexColor(1, 1, 1)
 
-        _G["GwActionBarHudRIGHTSWIM"]:SetVertexColor(1, 1, 1)
-        _G["GwActionBarHudLEFTSWIM"]:SetVertexColor(1, 1, 1)
+        self.actionBarHud.LeftSwim:SetVertexColor(1, 1, 1)
+        self.actionBarHud.RightSwim:SetVertexColor(1, 1, 1)
 
-        _G["GwActionBarHudLEFTBLOOD"]:SetVertexColor(1, 1, 1, 0)
-        _G["GwActionBarHudRIGHTBLOOD"]:SetVertexColor(1, 1, 1, 0)
+        self.actionBarHud.LeftBlood:SetVertexColor(1, 1, 1, 0)
+        self.actionBarHud.RightBlood:SetVertexColor(1, 1, 1, 0)
     end
 end
 GW.AddForProfiling("hud", "combatHealthState", combatHealthState)
 
 registerActionHudAura(
     31842,
-    "Interface\\AddOns\\GW2_UI\\textures\\leftshadow_holy",
-    "Interface\\AddOns\\GW2_UI\\textures\\rightshadow_holy"
+    "Interface/AddOns/GW2_UI/textures/hud/leftshadow_holy",
+    "Interface/AddOns/GW2_UI/textures/hud/rightshadow_holy",
+    "player"
 )
 registerActionHudAura(
     31884,
-    "Interface\\AddOns\\GW2_UI\\textures\\leftshadow_holy",
-    "Interface\\AddOns\\GW2_UI\\textures\\rightshadow_holy"
-)
-registerActionHudAura(
-    5487,
-    "Interface\\AddOns\\GW2_UI\\textures\\leftshadow_bear",
-    "Interface\\AddOns\\GW2_UI\\textures\\rightshadow_bear"
-)
-registerActionHudAura(
-    768,
-    "Interface\\AddOns\\GW2_UI\\textures\\leftshadow_cat",
-    "Interface\\AddOns\\GW2_UI\\textures\\rightshadow_cat"
+    "Interface/AddOns/GW2_UI/textures/hud/leftshadow_holy",
+    "Interface/AddOns/GW2_UI/textures/hud/rightshadow_holy",
+    "player"
 )
 registerActionHudAura(
     51271,
-    "Interface\\AddOns\\GW2_UI\\textures\\leftshadow_frost",
-    "Interface\\AddOns\\GW2_UI\\textures\\rightshadow_frost"
+    "Interface/AddOns/GW2_UI/textures/hud/leftshadow_frost",
+    "Interface/AddOns/GW2_UI/textures/hud/rightshadow_frost",
+    "player"
 )
 registerActionHudAura(
     162264,
-    "Interface\\AddOns\\GW2_UI\\textures\\leftshadow_metamorph",
-    "Interface\\AddOns\\GW2_UI\\textures\\rightshadow_metamorph"
+    "Interface/AddOns/GW2_UI/textures/hud/leftshadow_metamorph",
+    "Interface/AddOns/GW2_UI/textures/hud/rightshadow_metamorph",
+    "player"
 )
 registerActionHudAura(
     187827,
-    "Interface\\AddOns\\GW2_UI\\textures\\leftshadow_metamorph",
-    "Interface\\AddOns\\GW2_UI\\textures\\rightshadow_metamorph"
+    "Interface/AddOns/GW2_UI/textures/hud/leftshadow_metamorph",
+    "Interface/AddOns/GW2_UI/textures/hud/rightshadow_metamorph",
+    "player"
 )
 registerActionHudAura(
     215785,
-    "Interface\\AddOns\\GW2_UI\\textures\\leftshadow_shaman_fire",
-    "Interface\\AddOns\\GW2_UI\\textures\\rightshadow_shaman_fire"
-)registerActionHudAura(
-    77762,
-    "Interface\\AddOns\\GW2_UI\\textures\\leftshadow_shaman_fire",
-    "Interface\\AddOns\\GW2_UI\\textures\\rightshadow_shaman_fire"
-)registerActionHudAura(
-    201846,
-    "Interface\\AddOns\\GW2_UI\\textures\\leftshadow_shaman_storm",
-    "Interface\\AddOns\\GW2_UI\\textures\\rightshadow_shaman_storm"
+    "Interface/AddOns/GW2_UI/textures/hud/leftshadow_shaman_fire",
+    "Interface/AddOns/GW2_UI/textures/hud/rightshadow_shaman_fire",
+    "player"
 )
-
-local function LoadBreathMeter()
-    CreateFrame("Frame", "GwBreathMeter", UIParent, "GwBreathMeter")
-    GwBreathMeter:Hide()
-    GwBreathMeter:SetScript(
-        "OnShow",
-        function()
-            UIFrameFadeIn(GwBreathMeter, 0.2, GwBreathMeter:GetAlpha(), 1)
-        end
-    )
-    MirrorTimer1:SetScript(
-        "OnShow",
-        function(self)
-            self:Hide()
-        end
-    )
-    MirrorTimer1:UnregisterAllEvents()
-
-    GwBreathMeter:RegisterEvent("MIRROR_TIMER_START")
-    GwBreathMeter:RegisterEvent("MIRROR_TIMER_STOP")
-
-    GwBreathMeter:SetScript(
-        "OnEvent",
-        function(self, event, arg1, arg2, arg3, arg4)
-            if event == "MIRROR_TIMER_START" then
-                local texture = "Interface\\AddOns\\GW2_UI\\textures\\castingbar"
-                if arg1 == "BREATH" then
-                    texture = "Interface\\AddOns\\GW2_UI\\textures\\breathmeter"
-                end
-                GwBreathMeterBar:SetStatusBarTexture(texture)
-                GwBreathMeterBar:SetMinMaxValues(0, arg3)
-                GwBreathMeterBar:SetScript(
-                    "OnUpdate",
-                    function()
-                        GwBreathMeterBar:SetValue(GetMirrorTimerProgress(arg1))
-                    end
-                )
-                GwBreathMeter:Show()
-            end
-            if event == "MIRROR_TIMER_STOP" then
-                GwBreathMeterBar:SetScript("OnUpdate", nil)
-                GwBreathMeter:Hide()
-            end
-        end
-    )
-end
-GW.LoadBreathMeter = LoadBreathMeter
-
-local function updateGuildButton()
-    local _, _, numOnlineMembers = GetNumGuildMembers()
-
-    if numOnlineMembers ~= nil and numOnlineMembers > 0 then
-        GwMicroButtonGuildMicroButton.darkbg:Show()
-
-        if numOnlineMembers > 9 then
-            GwMicroButtonGuildMicroButton.darkbg:SetSize(18, 18)
-        else
-            GwMicroButtonGuildMicroButton.darkbg:SetSize(14, 14)
-        end
-
-        _G["GwMicroButtonGuildMicroButtonString"]:Show()
-        _G["GwMicroButtonGuildMicroButtonString"]:SetText(numOnlineMembers)
-    else
-        GwMicroButtonGuildMicroButton.darkbg:Hide()
-        _G["GwMicroButtonGuildMicroButtonString"]:Hide()
-    end
-end
-GW.AddForProfiling("hud", "updateGuildButton", updateGuildButton)
-
-local function updateInventoryButton()
-    local totalEmptySlots = 0
-
-    for i = 0, 4 do
-        local numberOfFreeSlots, _ = GetContainerNumFreeSlots(i)
-
-        if numberOfFreeSlots ~= nil then
-            totalEmptySlots = totalEmptySlots + numberOfFreeSlots
-        end
-    end
-
-    GwMicroButtonBagMicroButton.darkbg:Show()
-    if totalEmptySlots > 9 then
-        GwMicroButtonBagMicroButton.darkbg:SetSize(18, 18)
-    else
-        GwMicroButtonBagMicroButton.darkbg:SetSize(14, 14)
-    end
-
-    _G["GwMicroButtonBagMicroButtonString"]:Show()
-    _G["GwMicroButtonBagMicroButtonString"]:SetText(totalEmptySlots)
-end
-GW.AddForProfiling("hud", "updateInventoryButton", updateInventoryButton)
-
-local microButtonFrame = CreateFrame("Frame", "GwMicroButtonFrame", UIParent, "GwMicroButtonFrame")
-
-local microButtonPadding = 4 + 12
-
-local function createMicroButton(key)
-    local mf =
-        CreateFrame(
-        "Button",
-        "GwMicroButton" .. key,
-        microButtonFrame,
-        "SecureHandlerClickTemplate,GwMicroButtonTemplate"
-    )
-    mf:SetPoint("CENTER", microButtonFrame, "TOPLEFT", microButtonPadding, -16)
-    microButtonPadding = microButtonPadding + 24 + 4
-
-    mf:SetDisabledTexture("Interface\\AddOns\\GW2_UI\\textures\\" .. key .. "-Up")
-    mf:SetNormalTexture("Interface\\AddOns\\GW2_UI\\textures\\" .. key .. "-Up")
-    mf:SetPushedTexture("Interface\\AddOns\\GW2_UI\\textures\\" .. key .. "-Up")
-    mf:SetHighlightTexture("Interface\\AddOns\\GW2_UI\\textures\\" .. key .. "-Up")
-
-    _G["GwMicroButton" .. key .. "String"]:SetFont(DAMAGE_TEXT_FONT, 12)
-    _G["GwMicroButton" .. key .. "String"]:SetShadowColor(0, 0, 0, 0)
-
-    _G["GwMicroButton" .. key .. "Texture"]:Hide()
-    _G["GwMicroButton" .. key .. "String"]:Hide()
-
-    return mf
-end
-GW.AddForProfiling("hud", "createMicroButton", createMicroButton)
-
-local CUSTOM_MICRO_BUTTONS = {}
-
-local function microMenuFrameShow(f, name)
-    StopAnimation(name)
-    StopAnimation("GwHudArtFrameMenuBackDrop")
-    f.gw_FadeShowing = true
-    AddToAnimation(
-        name,
-        0,
-        1,
-        GetTime(),
-        0.1,
-        function()
-            f:SetAlpha(animations[name]["progress"])
-        end,
-        nil,
-        nil
-    )
-    AddToAnimation(
-        "GwHudArtFrameMenuBackDrop",
-        0,
-        1,
-        GetTime(),
-        0.1,
-        function()
-            GwHudArtFrameMenuBackDrop:SetAlpha(animations["GwHudArtFrameMenuBackDrop"]["progress"])
-        end,
-        nil,
-        nil
-    )
-end
-GW.AddForProfiling("hud", "microMenuFrameShow", microMenuFrameShow)
-
-local function microMenuFrameHide(f, name)
-    StopAnimation(name)
-    StopAnimation("GwHudArtFrameMenuBackDrop")
-    f.gw_FadeShowing = false
-    AddToAnimation(
-        name,
-        1,
-        0,
-        GetTime(),
-        0.1,
-        function()
-            f:SetAlpha(animations[name]["progress"])
-        end,
-        nil,
-        nil
-    )
-    AddToAnimation(
-        "GwHudArtFrameMenuBackDrop",
-        1,
-        0,
-        GetTime(),
-        0.1,
-        function()
-            GwHudArtFrameMenuBackDrop:SetAlpha(animations["GwHudArtFrameMenuBackDrop"]["progress"])
-        end,
-        nil,
-        nil
-    )
-end
-GW.AddForProfiling("hud", "microMenuFrameHide", microMenuFrameHide)
-
-local function microMenu_OnUpdate(self, elapsed)
-    self.gw_LastFadeCheck = self.gw_LastFadeCheck - elapsed
-    if self.gw_LastFadeCheck > 0 then
-        return
-    end
-    self.gw_LastFadeCheck = 0.1
-    if not self:IsShown() then
-        return
-    end
-
-    if self:IsMouseOver(100, -100, -100, 100) then
-        if not self.gw_FadeShowing then
-            microMenuFrameShow(self, self:GetName())
-        end
-    elseif self.gw_FadeShowing then
-        microMenuFrameHide(self, self:GetName())
-    end
-end
-GW.AddForProfiling("hud", "microMenu_OnUpdate", microMenu_OnUpdate)
-
-local gw_sendUpdate_message_cooldown = 0
-local function sendVersionCheck()
-    if gw_sendUpdate_message_cooldown > GetTime() then
-        return
-    end
-    gw_sendUpdate_message_cooldown = GetTime() + 10
-
-    local chatToSend = "GUILD"
-    local inInstanceGroup = IsInGroup(LE_PARTY_CATEGORY_INSTANCE)
-    if inInstanceGroup then
-        chatToSend = "INSTANCE_CHAT"
-    elseif IsInGroup() then
-        chatToSend = "PARTY"
-        if IsInRaid() then
-            chatToSend = "RAID"
-        end
-    end
-    C_ChatInfo.SendAddonMessage("GW2_UI", VERSION_STRING, chatToSend)
-end
-GW.AddForProfiling("hud", "sendVersionCheck", sendVersionCheck)
-
-local function receiveVersionCheck(self, event, prefix, message, dist, sender)
-    if prefix ~= "GW2_UI" then
-        return
-    end
-
-    local version, subversion, hotfix = string.match(message, "GW2_UI v(%d+).(%d+).(%d+)")
-    local Currentversion, Currentsubversion, Currenthotfix = string.match(VERSION_STRING, "GW2_UI v(%d+).(%d+).(%d+)")
-
-    if version == nil or subversion == nil or hotfix == nil then
-        return
-    end
-    if Currentversion == nil or Currentsubversion == nil or Currenthotfix == nil then
-        return
-    end
-
-    if version > Currentversion then
-        GwMicroButtonupdateicon.updateType = GwLocalization["UPDATE_STRING_3"]
-        GwMicroButtonupdateicon.updateTypeInt = 3
-        GwMicroButtonupdateicon:Show()
-    else
-        if subversion > Currentsubversion then
-            GwMicroButtonupdateicon.updateType = GwLocalization["UPDATE_STRING_2"]
-            GwMicroButtonupdateicon.updateTypeInt = 2
-            GwMicroButtonupdateicon:Show()
-        else
-            if hotfix > Currenthotfix then
-                GwMicroButtonupdateicon.updateType = GwLocalization["UPDATE_STRING_1"]
-                GwMicroButtonupdateicon.updateTypeInt = 1
-                GwMicroButtonupdateicon:Show()
-            end
-        end
-    end
-end
-GW.AddForProfiling("hud", "receiveVersionCheck", receiveVersionCheck)
-
-local function getToolTip(text, action)
-    if (GetBindingKey(action)) then
-        return text .. " |cffa6a6a6(" .. GetBindingText(GetBindingKey(action)) .. ")" .. FONT_COLOR_CODE_CLOSE
-    else
-        return text
-    end
-end
-GW.AddForProfiling("hud", "getToolTip", getToolTip)
-
-local function setToolTip(frame, text, action)
-    GameTooltip:SetOwner(frame, "ANCHOR_BOTTOMLEFT", 16 + (GameTooltip:GetWidth() / 2), -10)
-    GameTooltip:ClearLines()
-    GameTooltip:AddLine(getToolTip(text, action), 1, 1, 1)
-    GameTooltip:Show()
-end
-GW.AddForProfiling("hud", "setToolTip", setToolTip)
-
-local function hookToolTip(frame, text, action)
-    if frame == nil then
-        return
-    end
-    frame:SetScript(
-        "OnEnter",
-        function()
-            setToolTip(frame, text, action)
-            setToolTip(frame, text, action)
-        end
-    )
-    frame:SetScript("OnLeave", GameTooltip_Hide)
-end
-GW.AddForProfiling("hud", "hookToolTip", hookToolTip)
-
-local ipTypes = {"IPv4", "IPv6"}
-
-local gw_addonMemoryArray = {}
-local function latencyToolTip(self, elapsed)
-    if self.interval > 0 then
-        self.interval = self.interval - elapsed
-        return
-    end
-    self.interval = 1
-
-    local gw_frameRate = RoundInt(GetFramerate())
-    local _, _, lagHome, lagWorld = GetNetStats()
-    local percent = floor(GetDownloadedPercentage()*100+0.5)
-    local gw_addonMemory = 0
-    local gw_numAddons = GetNumAddOns()
-
-    -- wipe and reuse our memtable to avoid temp pre-GC bloat on the tooltip (still get a bit from the sort)
-    for i = 1, #gw_addonMemoryArray do
-        gw_addonMemoryArray[i]["addonIndex"] = 0
-        gw_addonMemoryArray[i]["addonMemory"] = 0
-    end
-
-    UpdateAddOnMemoryUsage()
-
-    GameTooltip:SetOwner(GwMicroButtonMainMenuMicroButton, "ANCHOR_BOTTOMLEFT", 16 + (GameTooltip:GetWidth() / 2), -10)
-    GameTooltip:ClearLines()
-    GameTooltip:AddLine(MAINMENU_BUTTON, 1, 1, 1)
-    GameTooltip:AddLine(" ")
-    GameTooltip:AddLine(MAINMENUBAR_LATENCY_LABEL:format(lagHome, lagWorld), 0.8, 0.8, 0.8)
-    GameTooltip:AddLine(" ")
-    if (GetCVarBool("useIPv6")) then
-		local ipTypeHome, ipTypeWorld = GetNetIpTypes()
-		GameTooltip:AddLine(MAINMENUBAR_PROTOCOLS_LABEL:format(ipTypes[ipTypeHome or 0] or UNKNOWN, ipTypes[ipTypeWorld or 0] or UNKNOWN), 0.8, 0.8, 0.8)
-		GameTooltip:AddLine(" ")
-	end
-    GameTooltip:AddLine(MAINMENUBAR_FPS_LABEL:format(gw_frameRate), 0.8, 0.8, 0.8)
-    GameTooltip:AddLine(" ")
-    GameTooltip:AddLine(MAINMENUBAR_BANDWIDTH_LABEL:format(GetAvailableBandwidth()), 0.8, 0.8, 0.8)
-    GameTooltip:AddLine(" ")
-    GameTooltip:AddLine(MAINMENUBAR_DOWNLOAD_PERCENT_LABEL:format(percent), 0.8, 0.8, 0.8)
-    GameTooltip:AddLine(" ")
-    
-    for i = 1, gw_numAddons do
-        if type(gw_addonMemoryArray[i]) ~= "table" then
-            gw_addonMemoryArray[i] = {}
-        end
-        local mem = GetAddOnMemoryUsage(i)
-        gw_addonMemoryArray[i]["addonIndex"] = i
-        gw_addonMemoryArray[i]["addonMemory"] = mem
-        gw_addonMemory = gw_addonMemory + mem
-    end
-
-    if (gw_addonMemory > 1024) then
-        gw_addonMemory = gw_addonMemory / 1024
-        GameTooltip:AddLine(TOTAL_MEM_MB_ABBR:format(gw_addonMemory), 0.8, 0.8, 0.8)
-    else
-        GameTooltip:AddLine(TOTAL_MEM_MB_ABBR:format(gw_addonMemory), 0.8, 0.8, 0.8)
-    end
-
-    if self.inDebug then
-        table.sort(
-            gw_addonMemoryArray,
-            function(a, b)
-                return a["addonMemory"] > b["addonMemory"]
-            end
-        )
-
-        for k, v in pairs(gw_addonMemoryArray) do
-            if v["addonIndex"] ~= 0 and (IsAddOnLoaded(v["addonIndex"]) and v["addonMemory"] ~= 0) then
-                gw_addonMemory = RoundDec(v["addonMemory"] / 1024, 2)
-                if gw_addonMemory ~= "0.00" then
-                    GameTooltip:AddLine(
-                        "(" .. gw_addonMemory .. " MB) " .. GetAddOnInfo(v["addonIndex"]),
-                        0.8,
-                        0.8,
-                        0.8
-                    )
-                end
-            end
-        end
-    else
-        gw_addonMemory = RoundDec(GetAddOnMemoryUsage("GW2_UI") / 1024, 2)
-        GameTooltip:AddLine("(" .. gw_addonMemory .. " MB) GW2_UI", 0.8, 0.8, 0.8)
-    end
-
-    GameTooltip:Show()
-end
-GW.AddForProfiling("hud", "latencyToolTip", latencyToolTip)
-
-local function talentMicro_OnEvent()
-    if not GW.inWorld then
-        return
-    end
-    if GetNumUnspentTalents() > 0 then
-        _G["GwMicroButtonTalentMicroButtonTexture"]:Show()
-        _G["GwMicroButtonTalentMicroButtonString"]:Show()
-        _G["GwMicroButtonTalentMicroButtonString"]:SetText(GetNumUnspentTalents())
-    else
-        _G["GwMicroButtonTalentMicroButtonTexture"]:Hide()
-        _G["GwMicroButtonTalentMicroButtonString"]:Hide()
-    end
-end
-GW.AddForProfiling("hud", "talentMicro_OnEvent", talentMicro_OnEvent)
-
-local function gwMicro_PositionAlert(alert)
-    if
-        (alert ~= CollectionsMicroButtonAlert and alert ~= LFDMicroButtonAlert and alert ~= EJMicroButtonAlert and
-            alert ~= StoreMicroButtonAlert and
-            alert ~= CharacterMicroButtonAlert)
-     then
-        return
-    end
-    alert.Arrow:ClearAllPoints()
-    alert.Arrow:SetPoint("BOTTOMLEFT", alert, "TOPLEFT", 4, -4)
-    alert:ClearAllPoints()
-    alert:SetPoint("TOPLEFT", alert.GwMicroButton, "BOTTOMLEFT", -18, -20)
-end
-GW.AddForProfiling("hud", "gwMicro_PositionAlert", gwMicro_PositionAlert)
-
-local function modifyMicroAlert(alert, microButton)
-    alert.GwMicroButton = microButton
-    alert.Arrow.Arrow:SetTexCoord(0.78515625, 0.99218750, 0.58789063, 0.54687500)
-    alert.Arrow.Glow:SetTexCoord(0.40625000, 0.66015625, 0.82812500, 0.77343750)
-    alert.Arrow.Glow:ClearAllPoints()
-    alert.Arrow.Glow:SetPoint("BOTTOM")
-end
-GW.AddForProfiling("hud", "modifyMicroAlert", modifyMicroAlert)
-
-local function LoadMicroMenu()
-    local mi = 1
-    for k, v in pairs(MICRO_BUTTONS) do
-        CUSTOM_MICRO_BUTTONS[mi] = v
-        if v == "CharacterMicroButton" then
-            mi = mi + 1
-            CUSTOM_MICRO_BUTTONS[mi] = "BagMicroButton"
-        end
-        mi = mi + 1
-    end
-
-    for k, v in pairs(CUSTOM_MICRO_BUTTONS) do
-        if v ~= "SpellbookMicroButton" then
-            createMicroButton(v)
-        else
-            if not GetSetting("USE_TALENT_WINDOW") then
-                createMicroButton(v)
-            end
-        end
-    end
-
-    if GetSetting("USE_CHARACTER_WINDOW") then
-        GwMicroButtonCharacterMicroButton:SetFrameRef("GwCharacterWindow", GwCharacterWindow)
-        GwMicroButtonCharacterMicroButton:SetAttribute(
-            "_onclick",
-            [=[
-            self:GetFrameRef("GwCharacterWindow"):SetAttribute("windowpanelopen", "paperdoll")
-            ]=]
-        )
-    else
-        GwMicroButtonCharacterMicroButton:SetScript(
-            "OnClick",
-            function()
-                ToggleCharacter("PaperDollFrame")
-            end
-        )
-    end
-
-    GwMicroButtonBagMicroButton:SetScript(
-        "OnClick",
-        function()
-            ToggleAllBags()
-        end
-    )
-
-    if GetSetting("USE_TALENT_WINDOW") then
-        GwMicroButtonTalentMicroButton:SetFrameRef("GwCharacterWindow", GwCharacterWindow)
-        GwMicroButtonTalentMicroButton:SetAttribute(
-            "_onclick",
-            [=[
-            self:GetFrameRef("GwCharacterWindow"):SetAttribute("windowpanelopen", "talents")
-            ]=]
-        )
-    else
-        GwMicroButtonSpellbookMicroButton:SetScript(
-            "OnClick",
-            function()
-                ToggleSpellBook(BOOKTYPE_SPELL)
-            end
-        )
-        GwMicroButtonSpellbookMicroButton:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-        GwMicroButtonTalentMicroButton:SetScript(
-            "OnClick",
-            function()
-                ToggleTalentFrame()
-            end
-        )
-    end
-
-    GwMicroButtonAchievementMicroButton:SetScript(
-        "OnClick",
-        function()
-            ToggleAchievementFrame()
-        end
-    )
-    GwMicroButtonQuestLogMicroButton:SetScript(
-        "OnClick",
-        function()
-            ToggleQuestLog()
-        end
-    )
-    GwMicroButtonGuildMicroButton:SetScript(
-        "OnClick",
-        function()
-            ToggleGuildFrame()
-        end
-    )
-    GwMicroButtonLFDMicroButton:SetScript(
-        "OnClick",
-        function()
-            PVEFrame_ToggleFrame()
-        end
-    )
-    GwMicroButtonCollectionsMicroButton:SetScript(
-        "OnClick",
-        function()
-            ToggleCollectionsJournal()
-        end
-    )
-    GwMicroButtonEJMicroButton:SetScript(
-        "OnClick",
-        function()
-            ToggleEncounterJournal()
-        end
-    )
-
-    GwMicroButtonMainMenuMicroButton:SetScript(
-        "OnClick",
-        function()
-            if (not GameMenuFrame:IsShown()) then
-                if (VideoOptionsFrame:IsShown()) then
-                    VideoOptionsFrameCancel:Click()
-                elseif (AudioOptionsFrame:IsShown()) then
-                    AudioOptionsFrameCancel:Click()
-                elseif (InterfaceOptionsFrame:IsShown()) then
-                    InterfaceOptionsFrameCancel:Click()
-                end
-
-                CloseMenus()
-                CloseAllWindows()
-                PlaySound(SOUNDKIT.IG_MAINMENU_OPEN)
-                ShowUIPanel(GameMenuFrame)
-            else
-                PlaySound(SOUNDKIT.IG_MAINMENU_QUIT)
-                HideUIPanel(GameMenuFrame)
-                MainMenuMicroButton_SetNormal()
-            end
-        end
-    )
-
-    if GwMicroButtonHelpMicroButton ~= nil then
-        GwMicroButtonHelpMicroButton:SetScript("OnClick", ToggleHelpFrame)
-    end
-    if GwMicroButtonStoreMicroButton ~= nil then
-        GwMicroButtonStoreMicroButton:SetScript("OnClick", ToggleStoreUI)
-    end
-
-    GwMicroButtonTalentMicroButton:SetScript("OnEvent", talentMicro_OnEvent)
-    GwMicroButtonTalentMicroButton:RegisterEvent("PLAYER_LEVEL_UP")
-    GwMicroButtonTalentMicroButton:RegisterEvent("UPDATE_BINDINGS")
-    GwMicroButtonTalentMicroButton:RegisterEvent("PLAYER_TALENT_UPDATE")
-    GwMicroButtonTalentMicroButton:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
-
-    hookToolTip(GwMicroButtonCharacterMicroButton, CHARACTER_BUTTON, 'TOGGLECHARACTER0"')
-    hookToolTip(GwMicroButtonBagMicroButton, INVENTORY_TOOLTIP, "OPENALLBAGS")
-    hookToolTip(GwMicroButtonSpellbookMicroButton, SPELLBOOK_ABILITIES_BUTTON, "TOGGLESPELLBOOK")
-    hookToolTip(GwMicroButtonTalentMicroButton, TALENTS_BUTTON, "TOGGLETALENTS")
-    hookToolTip(GwMicroButtonAchievementMicroButton, ACHIEVEMENT_BUTTON, "TOGGLEACHIEVEMENT")
-    hookToolTip(GwMicroButtonQuestLogMicroButton, QUESTLOG_BUTTON, "TOGGLEQUESTLOG")
-    hookToolTip(GwMicroButtonGuildMicroButton, GUILD, "TOGGLEGUILDTAB")
-    hookToolTip(GwMicroButtonLFDMicroButton, DUNGEONS_BUTTON, "TOGGLEGROUPFINDER")
-    hookToolTip(GwMicroButtonCollectionsMicroButton, COLLECTIONS, "TOGGLECOLLECTIONS")
-    hookToolTip(GwMicroButtonEJMicroButton, ADVENTURE_JOURNAL, "TOGGLEENCOUNTERJOURNAL")
-
-    GwMicroButtonBagMicroButton.interval = 0
-    GwMicroButtonBagMicroButton:SetScript(
-        "OnUpdate",
-        function(self, elapsed)
-            self.interval = self.interval - elapsed
-            if self.interval > 0 then
-                return
-            end
-
-            self.interval = 0.5
-            updateInventoryButton()
-        end
-    )
-
-    GwMicroButtonGuildMicroButton.interval = 0
-    GwMicroButtonGuildMicroButton:SetScript(
-        "OnUpdate",
-        function(self, elapsed)
-            if self.interval > 0 then
-                self.interval = self.interval - elapsed
-                return
-            end
-            self.interval = 15.0
-            GuildRoster()
-        end
-    )
-    GwMicroButtonGuildMicroButton:SetScript("OnEvent", updateGuildButton)
-    GwMicroButtonGuildMicroButton:RegisterEvent("GUILD_ROSTER_UPDATE")
-
-    GwMicroButtonMainMenuMicroButton.inDebug = GW.inDebug
-    GwMicroButtonMainMenuMicroButton:SetScript(
-        "OnEnter",
-        function(self)
-            self.interval = 0
-            self:SetScript("OnUpdate", latencyToolTip)
-            GameTooltip:SetOwner(self, "ANCHOR_CURSOR", 0, ANCHOR_BOTTOMLEFT)
-        end
-    )
-
-    GwMicroButtonMainMenuMicroButton:SetScript(
-        "OnLeave",
-        function()
-            GwMicroButtonMainMenuMicroButton:SetScript("OnUpdate", nil)
-            GameTooltip_Hide()
-        end
-    )
-
-    talentMicro_OnEvent()
-    updateGuildButton()
-    createOrderBar()
-
-    --Create update notifier
-    local updateNotificationIcon = createMicroButton("updateicon")
-    GwMicroButtonupdateicon.updateTypeInt = 0
-    GwMicroButtonupdateicon:Hide()
-
-    updateNotificationIcon:SetScript(
-        "OnEnter",
-        function()
-            GameTooltip:SetOwner(updateNotificationIcon, "ANCHOR_BOTTOMLEFT", 16 + (GameTooltip:GetWidth() / 2), -10)
-            GameTooltip:ClearLines()
-            GameTooltip:AddLine("GW2_UI", 1, 1, 1)
-            GameTooltip:AddLine(updateNotificationIcon.updateType, 1, 1, 1)
-            GameTooltip:Show()
-        end
-    )
-    updateNotificationIcon:SetScript("OnLeave", GameTooltip_Hide)
-    C_ChatInfo.RegisterAddonMessagePrefix("GW2_UI")
-
-    updateNotificationIcon:RegisterEvent("CHAT_MSG_ADDON")
-    updateNotificationIcon:RegisterEvent("GROUP_ROSTER_UPDATE")
-    updateNotificationIcon:SetScript(
-        "OnEvent",
-        function(self, event, prefix, message, dist, sender)
-            if event == "CHAT_MSG_ADDON" then
-                receiveVersionCheck(self, event, prefix, message, dist, sender)
-            else
-                sendVersionCheck()
-            end
-        end
-    )
-
-    -- if set to fade micro menu, add fader
-    if GetSetting("FADE_MICROMENU") then
-        microButtonFrame.gw_LastFadeCheck = -1
-        microButtonFrame.gw_FadeShowing = true
-        microButtonFrame:SetScript("OnUpdate", microMenu_OnUpdate)
-    end
-
-    -- fix tutorial alerts and hide the micromenu bar
-    MicroButtonAndBagsBar:Hide()
-    MicroButtonAndBagsBar:SetMovable(1)
-    MicroButtonAndBagsBar:SetUserPlaced(true)
-    MicroButtonAndBagsBar:SetMovable(0)
-    -- talent alert is always hidden by actionbars because we have a custom # on the button instead
-    modifyMicroAlert(CollectionsMicroButtonAlert, GwMicroButtonCollectionsMicroButton)
-    modifyMicroAlert(LFDMicroButtonAlert, GwMicroButtonLFDMicroButton)
-    modifyMicroAlert(EJMicroButtonAlert, GwMicroButtonEJMicroButton)
-    modifyMicroAlert(StoreMicroButtonAlert, GwMicroButtonHelpMicroButton)
-    modifyMicroAlert(CharacterMicroButtonAlert, GwMicroButtonCharacterMicroButton)
-    hooksecurefunc("MainMenuMicroButton_PositionAlert", gwMicro_PositionAlert)
-end
-GW.LoadMicroMenu = LoadMicroMenu
-
-local function levelingRewards_OnShow(self)
-    PlaySound(SOUNDKIT.ACHIEVEMENT_MENU_OPEN)
-    self.animationValue = -400
-    local name = self:GetName()
-    local start = GetTime()
-    AddToAnimation(
-        name,
-        self.animationValue,
-        0,
-        start,
-        0.2,
-        function()
-            local prog = animations[name]["progress"]
-            local a = lerp(0, 1, (GetTime() - start) / 0.2)
-            self:SetAlpha(a)
-            self:SetPoint("CENTER", 0, prog)
-        end
-    )
-end
-GW.AddForProfiling("hud", "levelingRewards_OnShow", levelingRewards_OnShow)
-
-local function loadRewards()
-    local f = CreateFrame("Frame", "GwLevelingRewards", UIParent, "GwLevelingRewards")
-
-    f.header:SetFont(DAMAGE_TEXT_FONT, 24)
-    f.header:SetText(GwLocalization["LEVEL_REWARDS"])
-
-    f.rewardHeader:SetFont(DAMAGE_TEXT_FONT, 11)
-    f.rewardHeader:SetTextColor(0.6, 0.6, 0.6)
-    f.rewardHeader:SetText(REWARD)
-
-    f.levelHeader:SetFont(DAMAGE_TEXT_FONT, 11)
-    f.levelHeader:SetTextColor(0.6, 0.6, 0.6)
-    f.levelHeader:SetText(LEVEL)
-
-    local fnGwCloseLevelingRewards_OnClick = function(self, button)
-        GwLevelingRewards:Hide()
-    end
-    GwCloseLevelingRewards:SetScript("OnClick", fnGwCloseLevelingRewards_OnClick)
-    GwCloseLevelingRewards:SetText(CLOSE)
-
-    _G["GwLevelingRewardsItem1"].name:SetFont(DAMAGE_TEXT_FONT, 14)
-    _G["GwLevelingRewardsItem1"].level:SetFont(DAMAGE_TEXT_FONT, 14)
-    _G["GwLevelingRewardsItem1"].name:SetText(GwLocalization["LEVEL_REWARDS"])
-
-    _G["GwLevelingRewardsItem2"].name:SetFont(DAMAGE_TEXT_FONT, 14)
-    _G["GwLevelingRewardsItem2"].level:SetFont(DAMAGE_TEXT_FONT, 14)
-    _G["GwLevelingRewardsItem2"].name:SetText(GwLocalization["LEVEL_REWARDS"])
-
-    _G["GwLevelingRewardsItem3"].name:SetFont(DAMAGE_TEXT_FONT, 14)
-    _G["GwLevelingRewardsItem3"].level:SetFont(DAMAGE_TEXT_FONT, 14)
-    _G["GwLevelingRewardsItem3"].name:SetText(GwLocalization["LEVEL_REWARDS"])
-
-    _G["GwLevelingRewardsItem4"].name:SetFont(DAMAGE_TEXT_FONT, 14)
-    _G["GwLevelingRewardsItem4"].level:SetFont(DAMAGE_TEXT_FONT, 14)
-    _G["GwLevelingRewardsItem4"].name:SetText(GwLocalization["LEVEL_REWARDS"])
-
-    f:SetScript("OnShow", levelingRewards_OnShow)
-
-    tinsert(UISpecialFrames, "GwLevelingRewards")
-end
-GW.AddForProfiling("hud", "loadRewards", loadRewards)
-
-local GW_LEVELING_REWARDS = {}
-displayRewards = function()
-    local _, englishClass = UnitClass("player")
-    local talentLevels = CLASS_TALENT_LEVELS[englishClass] or CLASS_TALENT_LEVELS["DEFAULT"]
-
-    wipe(GW_LEVELING_REWARDS)
-    for i = 1, 7 do
-        GW_LEVELING_REWARDS[i] = {}
-        GW_LEVELING_REWARDS[i]["type"] = "TALENT"
-        GW_LEVELING_REWARDS[i]["id"] = 0
-        GW_LEVELING_REWARDS[i]["level"] = talentLevels[i]
-    end
-
-    GW_LEVELING_REWARD_AVALIBLE = false
-
-    local currentSpec = GetSpecialization() -- Get the player's current spec
-    local spells = {GetSpecializationSpells(currentSpec)}
-    for k, v in pairs(spells) do
-        if v ~= nil then
-            local tIndex = #GW_LEVELING_REWARDS + 1
-            GW_LEVELING_REWARDS[tIndex] = {}
-            GW_LEVELING_REWARDS[tIndex]["type"] = "SPELL"
-            GW_LEVELING_REWARDS[tIndex]["id"] = v
-            GW_LEVELING_REWARDS[tIndex]["level"] = GetSpellLevelLearned(v)
-        end
-    end
-
-    for i = 1, 80 do
-        local skillType, spellId = GetSpellBookItemInfo(i, "spell")
-
-        if skillType == "FUTURESPELL" and spellId ~= nil then
-            local shouldAdd = true
-            for k, v in pairs(GW_LEVELING_REWARDS) do
-                if v["type"] == "SPELL" and v["id"] == spellId then
-                    shouldAdd = false
-                end
-            end
-            if shouldAdd then
-                local tIndex = #GW_LEVELING_REWARDS + 1
-
-                GW_LEVELING_REWARDS[tIndex] = {}
-                GW_LEVELING_REWARDS[tIndex]["type"] = "SPELL"
-                GW_LEVELING_REWARDS[tIndex]["id"] = spellId
-                GW_LEVELING_REWARDS[tIndex]["level"] = GetSpellLevelLearned(spellId)
-            end
-        end
-    end
-
-    table.sort(
-        GW_LEVELING_REWARDS,
-        function(a, b)
-            return a["level"] < b["level"]
-        end
-    )
-
-    local i = 1
-    for k, v in pairs(GW_LEVELING_REWARDS) do
-        if v["level"] > UnitLevel("player") then
-            
-            if _G["GwLevelingRewardsItem" .. i].mask ~= nil then
-                _G["GwLevelingRewardsItem" .. i].icon:RemoveMaskTexture(_G["GwLevelingRewardsItem" .. i].mask)
-            end
-            
-            _G["GwLevelingRewardsItem" .. i]:Show()
-            _G["GwLevelingRewardsItem" .. i].level:SetText(
-                v["level"] .. " |TInterface\\AddOns\\GW2_UI\\textures\\levelreward-icon:24:24:0:0|t "
-            )
-
-            if v["type"] == "SPELL" then
-                name, rank, icon = GetSpellInfo(v["id"])
-                _G["GwLevelingRewardsItem" .. i].icon:SetTexture(icon)
-                _G["GwLevelingRewardsItem" .. i].name:SetText(name)
-                _G["GwLevelingRewardsItem" .. i]:SetScript(
-                    "OnEnter", function()
-                        GameTooltip:SetOwner(GwLevelingRewards, "ANCHOR_CURSOR", 0, 0)
-                        GameTooltip:ClearLines()
-                        GameTooltip:SetSpellByID(v["id"])
-                        GameTooltip:Show()
-                    end)
-                if IsPassiveSpell(v["id"]) then
-                    if not _G["GwLevelingRewardsItem" .. i].mask then
-                        local mask = UIParent:CreateMaskTexture()
-                        mask:SetPoint("CENTER", _G["GwLevelingRewardsItem" .. i].icon, "CENTER", 0, 0)
-                        mask:SetTexture(
-                            "Interface\\AddOns\\GW2_UI\\textures\\talents\\passive_border",
-                            "CLAMPTOBLACKADDITIVE",
-                            "CLAMPTOBLACKADDITIVE"
-                            )
-                        mask:SetSize(40, 40)
-                        _G["GwLevelingRewardsItem" .. i].mask = mask
-                    end
-                    _G["GwLevelingRewardsItem" .. i].icon:AddMaskTexture(_G["GwLevelingRewardsItem" .. i].mask)
-                end    
-                _G["GwLevelingRewardsItem" .. i]:SetScript("OnLeave", GameTooltip_Hide)
-            elseif v["type"] == "TALENT" then
-                _G["GwLevelingRewardsItem" .. i].icon:SetTexture("Interface\\AddOns\\GW2_UI\\textures\\talent-icon")
-                _G["GwLevelingRewardsItem" .. i].name:SetText(BONUS_TALENTS)
-                _G["GwLevelingRewardsItem" .. i]:SetScript(
-                    "OnEnter",
-                    function()
-                    end
-                )
-                _G["GwLevelingRewardsItem" .. i]:SetScript(
-                    "OnLeave",
-                    function()
-                    end
-                )
-            end
-            GW_LEVELING_REWARD_AVALIBLE = true
-
-            i = i + 1
-            if i > 4 then
-                break
-            end
-        end
-    end
-
-    if i < 5 then
-        while i < 5 do
-            _G["GwLevelingRewardsItem" .. i]:Hide()
-            i = i + 1
-        end
-    end
-end
-GW.AddForProfiling("hud", "displayRewards", displayRewards)
-
-local function orderFollower_OnEnter(self)
-    if (self.name) then
-        GameTooltip:SetOwner(self, "ANCHOR_PRESERVE")
-        GameTooltip:ClearAllPoints()
-        GameTooltip:SetPoint("TOPLEFT", self.Count, "BOTTOMRIGHT", -20, -20)
-        GameTooltip:AddLine(self.name)
-        if (self.description) then
-            GameTooltip:AddLine(self.description, 1, 1, 1, true)
-        end
-        GameTooltip:Show()
-    end
-end
-GW.AddForProfiling("hud", "orderFollower_OnEnter", orderFollower_OnEnter)
-
-local function createFollower(self, i)
-    local newFrame = CreateFrame("FRAME", "GwOrderHallFollower" .. i, self, "GwOrderHallFollower")
-    newFrame.Count:SetFont(UNIT_NAME_FONT, 14)
-    newFrame.Count:SetShadowOffset(1, -1)
-    newFrame:SetScript("OnEnter", orderFollower_OnEnter)
-    newFrame:SetScript("OnLeave", GameTooltip_Hide)
-    newFrame:SetParent(self)
-    newFrame:ClearAllPoints()
-    newFrame:SetPoint("LEFT", self.currency, "RIGHT", 100 * (i - 1), 0)
-    return newFrame
-end
-GW.AddForProfiling("hud", "createFollower", createFollower)
-
-local function updateOrderBar(self)
-    local categoryInfo = C_Garrison.GetClassSpecCategoryInfo(LE_FOLLOWER_TYPE_GARRISON_7_0)
-
-    for index, category in ipairs(categoryInfo) do
-        local categoryInfoFrame = _G["GwOrderHallFollower" .. index]
-        if _G["GwOrderHallFollower" .. index] == nil then
-            categoryInfoFrame = createFollower(self, index)
-        end
-
-        categoryInfoFrame.Icon:SetTexture(category.icon)
-        categoryInfoFrame.Icon:SetTexCoord(0, 1, 0.25, 0.75)
-        categoryInfoFrame.name = category.name
-        categoryInfoFrame.description = category.description
-
-        categoryInfoFrame.Count:SetFormattedText(ORDER_HALL_COMMANDBAR_CATEGORY_COUNT, category.count, category.limit)
-
-        categoryInfoFrame:Show()
-    end
-end
-GW.AddForProfiling("hud", "updateOrderBar", updateOrderBar)
-
-local function orderBar_OnEvent(self, event)
-    if event ~= "PLAYER_ENTERING_WORLD" and not GW.inWorld then
-        return
-    end
-    if OrderHallCommandBar then
-        OrderHallCommandBar:SetShown(false)
-        OrderHallCommandBar:UnregisterAllEvents()
-        OrderHallCommandBar:SetScript("OnShow", Self_Hide)
-    end
-
-    local inOrderHall = C_Garrison.IsPlayerInGarrison(LE_GARRISON_TYPE_7_0)
-    self:SetShown(inOrderHall)
-
-    local primaryCurrency, _ = C_Garrison.GetCurrencyTypes(LE_GARRISON_TYPE_7_0)
-
-    local _, amount, _ = GetCurrencyInfo(primaryCurrency)
-    amount = BreakUpLargeNumbers(amount)
-    self.currency:SetText(amount)
-
-    updateOrderBar(self)
-end
-GW.AddForProfiling("hud", "orderBar_OnEvent", orderBar_OnEvent)
-
-createOrderBar = function()
-    CreateFrame("FRAME", "GwOrderhallBar", UIParent, "GwOrderhallBar")
-    GwOrderhallBar.currency:SetFont(UNIT_NAME_FONT, 14)
-    GwOrderhallBar.currency:SetShadowOffset(1, -1)
-
-    GwOrderhallBar:RegisterUnitEvent("UNIT_AURA", "player")
-    GwOrderhallBar:RegisterUnitEvent("UNIT_PHASE", "player")
-    GwOrderhallBar:RegisterEvent("PLAYER_ALIVE")
-    GwOrderhallBar:RegisterEvent("PLAYER_ENTERING_WORLD")
-
-    local inOrderHall = C_Garrison.IsPlayerInGarrison(LE_GARRISON_TYPE_7_0)
-    if inOrderHall then
-        GwOrderhallBar:RegisterEvent("CURRENCY_DISPLAY_UPDATE")
-        GwOrderhallBar:RegisterEvent("DISPLAY_SIZE_CHANGED")
-        GwOrderhallBar:RegisterEvent("UI_SCALE_CHANGED")
-        GwOrderhallBar:RegisterEvent("GARRISON_TALENT_COMPLETE")
-        GwOrderhallBar:RegisterEvent("GARRISON_TALENT_UPDATE")
-        GwOrderhallBar:RegisterEvent("GARRISON_FOLLOWER_CATEGORIES_UPDATED")
-        GwOrderhallBar:RegisterEvent("GARRISON_FOLLOWER_ADDED")
-        GwOrderhallBar:RegisterEvent("GARRISON_FOLLOWER_REMOVED")
-        GwOrderhallBar:RegisterEvent("GARRISON_FOLLOWER_LIST_UPDATE")
-        GwOrderhallBar:RegisterEvent("GARRISON_MISSION_FINISHED")
-        GwOrderhallBar:RegisterEvent("UPDATE_BINDINGS")
-    end
-
-    GwOrderhallBar:SetScript("OnEvent", orderBar_OnEvent)
-    GwOrderhallBar:SetScript(
-        "OnShow",
-        function()
-            GwOrderhallBar:RegisterEvent("CURRENCY_DISPLAY_UPDATE")
-            GwOrderhallBar:RegisterEvent("DISPLAY_SIZE_CHANGED")
-            GwOrderhallBar:RegisterEvent("UI_SCALE_CHANGED")
-            GwOrderhallBar:RegisterEvent("GARRISON_TALENT_COMPLETE")
-            GwOrderhallBar:RegisterEvent("GARRISON_TALENT_UPDATE")
-            GwOrderhallBar:RegisterEvent("GARRISON_FOLLOWER_CATEGORIES_UPDATED")
-            GwOrderhallBar:RegisterEvent("GARRISON_FOLLOWER_ADDED")
-            GwOrderhallBar:RegisterEvent("GARRISON_FOLLOWER_REMOVED")
-            GwOrderhallBar:RegisterEvent("GARRISON_FOLLOWER_LIST_UPDATE")
-            GwOrderhallBar:RegisterEvent("GARRISON_MISSION_FINISHED")
-            GwOrderhallBar:RegisterEvent("UPDATE_BINDINGS")
-        end
-    )
-
-    GwOrderhallBar:SetScript(
-        "OnHide",
-        function()
-            GwOrderhallBar:UnregisterEvent("CURRENCY_DISPLAY_UPDATE")
-            GwOrderhallBar:UnregisterEvent("DISPLAY_SIZE_CHANGED")
-            GwOrderhallBar:UnregisterEvent("UI_SCALE_CHANGED")
-            GwOrderhallBar:UnregisterEvent("GARRISON_TALENT_COMPLETE")
-            GwOrderhallBar:UnregisterEvent("GARRISON_TALENT_UPDATE")
-            GwOrderhallBar:UnregisterEvent("GARRISON_FOLLOWER_CATEGORIES_UPDATED")
-            GwOrderhallBar:UnregisterEvent("GARRISON_FOLLOWER_ADDED")
-            GwOrderhallBar:UnregisterEvent("GARRISON_FOLLOWER_REMOVED")
-            GwOrderhallBar:UnregisterEvent("GARRISON_FOLLOWER_LIST_UPDATE")
-            GwOrderhallBar:UnregisterEvent("GARRISON_MISSION_FINISHED")
-            GwOrderhallBar:UnregisterEvent("UPDATE_BINDINGS")
-        end
-    )
-
-    orderBar_OnEvent(GwOrderhallBar)
-end
-GW.AddForProfiling("hud", "createOrderBar", createOrderBar)
+registerActionHudAura(
+    77762,
+    "Interface/AddOns/GW2_UI/textures/hud/leftshadow_shaman_fire",
+    "Interface/AddOns/GW2_UI/textures/hud/rightshadow_shaman_fire",
+    "player"
+)
+registerActionHudAura(
+    201846,
+    "Interface/AddOns/GW2_UI/textures/hud/leftshadow_shaman_storm",
+    "Interface/AddOns/GW2_UI/textures/hud/rightshadow_shaman_storm",
+    "player"
+)
+registerActionHudAura(
+    63560,
+    "Interface/AddOns/GW2_UI/textures/hud/leftshadow_unholy",
+    "Interface/AddOns/GW2_UI/textures/hud/rightshadow_unholy",
+    "pet"
+)
+registerActionHudAura(
+    375087,
+    "Interface/AddOns/GW2_UI/textures/hud/evokerdpsLeft",
+    "Interface/AddOns/GW2_UI/textures/hud/evokerdpsRight",
+    "player"
+)
 
 local function hud_OnEvent(self, event, ...)
     if event == "UNIT_AURA" then
         local unit = ...
         if unit == "player" then
-            selectBg()
+            selectBg(self)
         end
     elseif event == "PLAYER_REGEN_DISABLED" or event == "PLAYER_REGEN_ENABLED" then
-        selectBg()
-    elseif event == "UNIT_HEALTH" or event == "UNIT_HEALTH_FREQUENT" or event == "UNIT_MAXHEALTH" then
+        selectBg(self)
+    elseif event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH" then
         local unit = ...
         if unit == "player" then
-            combatHealthState()
+            combatHealthState(self)
         end
     end
 end
 GW.AddForProfiling("hud", "hud_OnEvent", hud_OnEvent)
 
-local function LoadHudArt()
-    local hudArtFrame = CreateFrame("Frame", "GwHudArtFrame", UIParent, "GwHudArtFrame")
-    GW.MixinHideDuringPetAndOverride(hudArtFrame)
-
-    if not GetSetting("BORDER_ENABLED") and hudArtFrame.edgeTint then
-        for _, f in ipairs(hudArtFrame.edgeTint) do
-            f:Hide()
+local function ToggleHudBackground()
+    if Gw2_HudBackgroud.actionBarHud.HUDBG then
+        for _, f in ipairs(Gw2_HudBackgroud.actionBarHud.HUDBG) do
+            if GW.settings.HUD_BACKGROUND then
+                f:Show()
+            else
+                f:Hide()
+            end
         end
     end
-    
+
+    if Gw2_HudBackgroud.edgeTint then
+        local showBorder = GW.settings.BORDER_ENABLED
+        for _, f in ipairs(Gw2_HudBackgroud.edgeTint) do
+            if showBorder then
+                f:Show()
+            else
+                f:Hide()
+            end
+        end
+
+        --Gw2MicroBarFrame.cf.bg:SetShown(showBorder)
+    end
+end
+GW.ToggleHudBackground = ToggleHudBackground
+
+local function LoadHudArt()
+    local hudArtFrame = CreateFrame("Frame", "Gw2_HudBackgroud", UIParent, "GwHudArtFrame")
+    GW.MixinHideDuringPetAndOverride(hudArtFrame)
+
+    ToggleHudBackground()
+    GW.RegisterScaleFrame(hudArtFrame.actionBarHud)
+
     hudArtFrame:SetScript("OnEvent", hud_OnEvent)
+
+    GW.Libs.GW2Lib.RegisterCallback(hudArtFrame, "GW2_PLAYER_DRAGONRIDING_STATE_CHANGE", function()
+        selectBg(hudArtFrame)
+    end)
 
     hudArtFrame:RegisterEvent("UNIT_AURA")
     hudArtFrame:RegisterEvent("PLAYER_ALIVE")
     hudArtFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
     hudArtFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
-    hudArtFrame:RegisterEvent("UNIT_HEALTH")
-    hudArtFrame:RegisterEvent("UNIT_HEALTH_FREQUENT")
-    hudArtFrame:RegisterEvent("UNIT_MAXHEALTH")
-    selectBg()
-    combatHealthState()
+    hudArtFrame:RegisterUnitEvent("UNIT_HEALTH", "player")
+    hudArtFrame:RegisterUnitEvent("UNIT_MAXHEALTH", "player")
+    selectBg(hudArtFrame)
+    combatHealthState(hudArtFrame)
+
+    --Loss Of Control Icon Skin
+    LossOfControlFrame.Icon:SetTexCoord(0.1, 0.9, 0.1, 0.9)
+
+    return hudArtFrame
 end
 GW.LoadHudArt = LoadHudArt
 
 local function LoadXPBar()
-    loadRewards()
+
+    StatusTrackingBarManager:GwKill()
+    GW.LoadUpcomingSpells()
 
     local experiencebar = CreateFrame("Frame", "GwExperienceFrame", UIParent, "GwExperienceBar")
     GW.MixinHideDuringPet(experiencebar)
-    GwlevelLableRightButton:SetScript("OnClick", xpbar_OnClick)
-    
-    _G["GwExperienceFrameArtifactBar"].animation:SetScript('OnShow', function()
-            _G["GwExperienceFrameArtifactBar"].animation:SetScript('OnUpdate', function(self, elapsed)
-                animateAzeriteBar(_G["GwExperienceFrameArtifactBar"].animation, elapsed)
-            end)
-    end)
-    _G["GwExperienceFrameArtifactBar"].animation:SetScript('OnHide', function()
-           _G["GwExperienceFrameArtifactBar"].animation:SetScript('OnUpdate', nil)
-    end)
+    experiencebar.rightButton:SetScript("OnClick", xpbar_OnClick)
+    experiencebar.rightButton:SetScript(
+        "OnEnter",
+        function(self)
+            local p = self:GetParent()
+            p.NextLevel.oldColor = {}
+            p.NextLevel.oldColor.r, p.NextLevel.oldColor.g, p.NextLevel.oldColor.b = p.NextLevel:GetTextColor()
+            p.NextLevel:SetTextColor(p.NextLevel.oldColor.r * 2, p.NextLevel.oldColor.g * 2, p.NextLevel.oldColor.b * 2)
+        end
+    )
+    experiencebar.rightButton:SetScript(
+        "OnLeave",
+        function(self)
+            local p = self:GetParent()
+            if p.NextLevel.oldColor == nil then
+                return
+            end
+            p.NextLevel:SetTextColor(p.NextLevel.oldColor.r, p.NextLevel.oldColor.g, p.NextLevel.oldColor.b)
+        end
+    )
+
+    experiencebar.AzeritBar.animation:SetScript(
+        "OnShow",
+        function(self)
+            self:SetScript(
+                "OnUpdate",
+                function(self, elapsed)
+                    animateAzeriteBar(self, elapsed)
+                end
+            )
+        end
+    )
+    experiencebar.AzeritBar.animation:SetScript(
+        "OnHide",
+        function(self)
+            self:SetScript("OnUpdate", nil)
+        end
+    )
 
     experiencebarAnimation = UnitXP("Player") / UnitXPMax("Player")
 
-    _G["GwExperienceFrameArtifactBar"].artifactBarAnimation = 0
-    _G["GwExperienceFrameNextLevel"]:SetFont(UNIT_NAME_FONT, 12)
-    _G["GwExperienceFrameCurrentLevel"]:SetFont(UNIT_NAME_FONT, 12)
+    experiencebar.RepuBar.repuBarAnimation = 0
+    experiencebar.AzeritBar.AzeritBarAnimation = 0
+    experiencebar.NextLevel:SetFont(UNIT_NAME_FONT, 12)
+    experiencebar.CurrentLevel:SetFont(UNIT_NAME_FONT, 12)
 
-    updateBarSize()
-    xpbar_OnEvent()
+    updateBarSize(experiencebar)
+    xpbar_OnEvent(experiencebar)
 
     experiencebar:SetScript("OnEvent", xpbar_OnEvent)
 
@@ -1873,17 +1031,30 @@ local function LoadXPBar()
     experiencebar:RegisterEvent("ARTIFACT_XP_UPDATE")
     experiencebar:RegisterEvent("AZERITE_ITEM_EXPERIENCE_CHANGED")
     experiencebar:RegisterEvent("PLAYER_UPDATE_RESTING")
-    experiencebar:RegisterEvent("CHAT_MSG_COMBAT_HONOR_GAIN")
+    experiencebar:RegisterEvent("HONOR_XP_UPDATE")
     experiencebar:RegisterEvent("PLAYER_ENTERING_BATTLEGROUND")
     experiencebar:RegisterEvent("PLAYER_ENTERING_WORLD")
+    experiencebar:RegisterEvent("PLAYER_LEVEL_CHANGED")
+    experiencebar:RegisterEvent("UPDATE_EXHAUSTION")
+    hooksecurefunc("SetWatchingHonorAsXP", function()
+        xpbar_OnEvent(experiencebar)
+    end)
 
     experiencebar:SetScript("OnEnter", xpbar_OnEnter)
     experiencebar:SetScript(
         "OnLeave",
-        function()
+        function(self)
             GameTooltip_Hide()
-            UIFrameFadeIn(GwExperienceFrameBar, 0.2, GwExperienceFrameBar:GetAlpha(), 1)
-            UIFrameFadeIn(_G["GwExperienceFrameArtifactBar"], 0.2, _G["GwExperienceFrameArtifactBar"]:GetAlpha(), 1)
+
+            if self.expBarShouldShow then
+                UIFrameFadeIn(self.ExpBar, 0.2, self.ExpBar:GetAlpha(), 1)
+            end
+            if self.azeritBarShouldShow then
+                UIFrameFadeIn(self.AzeritBar, 0.2, self.AzeritBar:GetAlpha(), 1)
+            end
+            if self.repuBarShouldShow then
+                UIFrameFadeIn(self.RepuBar, 0.2, self.RepuBar:GetAlpha(), 1)
+            end
         end
     )
 end

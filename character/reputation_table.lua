@@ -2,6 +2,59 @@ local _, GW = ...
 
 local T = {}
 
+--dragonflight
+T[2507] = "DRAGONFLIGHT/dragonscale"
+T[2503] = "DRAGONFLIGHT/maruuk"
+T[2511] = "DRAGONFLIGHT/tuskar"
+T[2510] = "DRAGONFLIGHT/VALDRAKK"
+--[[
+Dragonscale Expedition 2507
+Iskaara Tuskarr 2511
+Maruuk Centaur 2503
+Valdrakken Accord 2510
+Artisan's Consortium - Dragon Isles Branch 2544
+Cobalt Assembly 2550
+Sabellian 2518
+Wrathion 2517
+Dragonscale Expedition 2507
+Iskaara Tuskarr 2511
+Maruuk Centaur 2503
+Valdrakken Accord 2510
+Artisan's Consortium - Dragon Isles Branch 2544
+Cobalt Assembly 2550
+Sabellian 2518
+Wrathion 2517
+]]--
+-- SL
+--T[2422] = "SL/TheWildHunt"
+--T[2439] = "SL/Avowed"
+--T[2413] = "SL/CourtOfHarvesters"
+--T[2410] = "SL/TheUndyingArmy"
+--T[2407] = "SL/Ascended"
+--T[2462] = "SL/Stitchmasters"
+--T[2432] = "SL/Venari"
+--T[2445] = "SL/TheEmverCourt"
+--T[2459] = "SL/Sika"
+--T[2452] = "SL/PolemarchAdrestes"
+--T[2444] = "SL/TheWildHunt" -- Paragon
+--T[2450] = "SL/AlecandrosMorgraine"
+--T[2441] = "SL/Ascended" -- Paragon
+--T[2456] = "SL/DromanAliothe"
+--T[2447] = "SL/LadyMoonberry"
+--T[2454] = "SL/Choofa"
+--T[2453] = "SL/RendleAndCudgelface"
+--T[2460] = "SL/Stonehead"
+--T[2449] = "SL/Countess"
+--T[2446] = "SL/BaronessVashj"
+--T[2451] = "SL/HuntCaptainKorayn"
+--T[2458] = "SL/KleiaAndPelagos"
+--T[2448] = "SL/Mikanikos"
+--T[2440] = "SL/TheUndyingArmy" -- Paragon
+--T[2442] = "SL/CourtOfHarvesters" -- Paragon
+--T[2455] = "SL/CryptkeeperKassir"
+--T[2457] = "SL/GrandmasterVole"
+--T[2461] = "SL/PlagueDeviserMarileth"
+
 -- BFA
 T[2159] = "BFA/7thLegion"
 T[2164] = "BFA/Champions"
@@ -13,6 +66,12 @@ T[2156] = "BFA/Talanji Expe"
 T[2158] = "BFA/Voldunai"
 T[2103] = "BFA/Zandalari Empire"
 T[2157] = "BFA/Honorbound"
+T[2391] = "BFA/Meca"
+T[2400] = "BFA/Ankoan"
+T[2373] = "BFA/Unshackled"
+T[2415] = "BFA/Rajani"
+T[2417] = "BFA/Uldum Accord"
+T[2395] = "BFA/Honeyback"
 
 -- Legion
 T[2170] = "Legion/Argus"
@@ -48,7 +107,14 @@ T[1710] = "WOD/Sha'tari"
 T[1681] = "WOD/Spear"
 T[1732] = "WOD/Steamwheedle"
 T[1711] = "WOD/Steamwheedle"
-T[1682] = "WOD/Wrynn"
+T[1735] = "WOD/Barracks Bodyguard"
+T[1736] = "WOD/Tormmok"
+T[1741] = "WOD/Leorajh"
+T[1733] = "WOD/Delvar Ironfist"
+T[1739] = "WOD/Vivianne"
+T[1740] = "WOD/Aeda Brightdawn"
+T[1737] = "WOD/Talonpriest Ishaal"
+T[1738] = "WOD/Defender Illona"
 
 --MoP
 T[1351] = "MOP/Brewmasters"
@@ -148,17 +214,20 @@ T[1133] = "Classic_Other/Bilgewater"
 T[1691] = "Classic_Other/Bizmo"
 T[1419] = "Classic_Other/Bizmo"
 T[2011] = "Classic_Other/Bizmo"
+T[2371] = "Classic_Other/Bizmo"
 T[87] = "Classic_Other/Bloodsail"
 T[21] = "Classic_Other/BootyBay"
 T[1374] = "Classic_Other/Brawl'gar Arena"
 T[1690] = "Classic_Other/Brawl'gar Arena"
 T[2010] = "Classic_Other/Brawl'gar Arena"
+T[2372] = "Classic_Other/Brawl'gar Arena"
 T[910] = "Classic_Other/Brood of Nozdormu"
 T[609] = "Classic_Other/Cenarion Circle"
 T[909] = "Classic_Other/Darkmoon"
 T[530] = "Classic_Other/Darkspear"
 T[69] = "Classic_Other/Darnassus"
 T[577] = "Classic_Other/Everlook"
+T[930] = "Classic_Other/Exodar"
 T[729] = "Classic_Other/Frostwolf"
 T[369] = "Classic_Other/Gadgetzan"
 T[92] = "Classic_Other/Gelkis Clan Centaur"

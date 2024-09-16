@@ -1,201 +1,25 @@
 local _, GW = ...
 local COLOR_FRIENDLY = GW.COLOR_FRIENDLY
-local DEBUFF_COLOR = GW.DEBUFF_COLOR
-local GetSetting = GW.GetSetting
 local TimeCount = GW.TimeCount
 local CommaValue = GW.CommaValue
-local Diff = GW.Diff
 local PowerBarColorCustom = GW.PowerBarColorCustom
 local bloodSpark = GW.BLOOD_SPARK
-local CLASS_COLORS_RAIDFRAME = GW.CLASS_COLORS_RAIDFRAME
+local GWGetClassColor = GW.GWGetClassColor
 local TARGET_FRAME_ART = GW.TARGET_FRAME_ART
 local RegisterMovableFrame = GW.RegisterMovableFrame
 local animations = GW.animations
 local AddToAnimation = GW.AddToAnimation
 local AddToClique = GW.AddToClique
-local Debug = GW.Debug
 local IsIn = GW.IsIn
-local GetRealItemLevel = GW.GetRealItemLevel
-local unitIlvls = {}
+local RoundDec = GW.RoundDec
+local LoadAuras = GW.LoadAuras
+local UpdateBuffLayout = GW.UpdateBuffLayout
+local PopulateUnitIlvlsCache = GW.PopulateUnitIlvlsCache
 
-local function sortAuras(a, b)
-    if a["caster"] == nil then
-        a["caster"] = ""
-    end
-    if b["caster"] == nil then
-        b["caster"] = ""
-    end
-
-    if a["caster"] == b["caster"] then
-        return a["timeremaning"] < b["timeremaning"]
-    end
-
-    return (b["caster"] ~= "player" and a["caster"] == "player")
-end
-GW.AddForProfiling("unitframes", "sortAuras", sortAuras)
-
-local function sortAuraList(auraList)
-    table.sort(
-        auraList,
-        function(a, b)
-            return sortAuras(a, b)
-        end
-    )
-
-    return auraList
-end
-GW.AddForProfiling("unitframes", "sortAuraList", sortAuraList)
-
-local function getBuffs(unit, filter)
-    if filter == nil then
-        filter = ""
-    end
-    local auraList = {}
-    for i = 1, 40 do
-        if UnitBuff(unit, i, filter) ~= nil then
-            auraList[i] = {}
-            auraList[i]["id"] = i
-
-            auraList[i]["name"],
-                auraList[i]["icon"],
-                auraList[i]["count"],
-                auraList[i]["dispelType"],
-                auraList[i]["duration"],
-                auraList[i]["expires"],
-                auraList[i]["caster"],
-                auraList[i]["isStealable"],
-                auraList[i]["shouldConsolidate"],
-                auraList[i]["spellID"] = UnitBuff(unit, i, filter)
-
-            auraList[i]["timeremaning"] = auraList[i]["expires"] - GetTime()
-
-            if auraList[i]["duration"] <= 0 then
-                auraList[i]["timeremaning"] = 500001
-            end
-        end
-    end
-
-    return sortAuraList(auraList)
-end
-GW.AddForProfiling("unitframes", "getBuffs", getBuffs)
-
-local function getDebuffs(unit, filter)
-    local auraList = {}
-
-    for i = 1, 40 do
-        if UnitDebuff(unit, i, filter) ~= nil then
-            auraList[i] = {}
-            auraList[i]["id"] = i
-
-            auraList[i]["name"],
-                auraList[i]["icon"],
-                auraList[i]["count"],
-                auraList[i]["dispelType"],
-                auraList[i]["duration"],
-                auraList[i]["expires"],
-                auraList[i]["caster"],
-                auraList[i]["isStealable"],
-                auraList[i]["shouldConsolidate"],
-                auraList[i]["spellID"] = UnitDebuff(unit, i, filter)
-
-            auraList[i]["timeremaning"] = auraList[i]["expires"] - GetTime()
-
-            if auraList[i]["duration"] <= 0 then
-                auraList[i]["timeremaning"] = 500001
-            end
-        end
-    end
-
-    return sortAuraList(auraList)
-end
-GW.AddForProfiling("unitframes", "getDebuffs", getDebuffs)
-
-local function setAuraType(self, typeAura)
-    if self.typeAura == typeAura then
-        return
-    end
-
-    if typeAura == "smallbuff" then
-        self.icon:SetPoint("TOPLEFT", self, "TOPLEFT", 1, -1)
-        self.icon:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -1, 1)
-        self.duration:SetFont(UNIT_NAME_FONT, 11)
-        self.stacks:SetFont(UNIT_NAME_FONT, 12, "OUTLINED")
-    end
-
-    if typeAura == "bigBuff" then
-        self.icon:SetPoint("TOPLEFT", self, "TOPLEFT", 3, -3)
-        self.icon:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -3, 3)
-        self.duration:SetFont(UNIT_NAME_FONT, 14)
-        self.stacks:SetFont(UNIT_NAME_FONT, 14, "OUTLINED")
-    end
-
-    self.typeAura = typeAura
-end
-GW.AddForProfiling("unitframes", "setAuraType", setAuraType)
-
-local function setBuffData(self, buffs, i, oldBuffs)
-    if not self or not buffs then
-        return false
-    end
-    local b = buffs[i]
-    if b == nil or b["name"] == nil then
-        return false
-    end
-
-    local stacks = ""
-    local duration = ""
-
-    if b["caster"] == "player" and (b["duration"] > 0 and b["duration"] < 120) then
-        setAuraType(self, "bigBuff")
-
-        self.cooldown:SetCooldown(b["expires"] - b["duration"], b["duration"])
-    else
-        setAuraType(self, "smallbuff")
-    end
-
-    if b["count"] ~= nil and b["count"] > 1 then
-        stacks = b["count"]
-    end
-    if b["timeremaning"] ~= nil and b["timeremaning"] > 0 and b["timeremaning"] < 500000 then
-        duration = TimeCount(b["timeremaning"])
-    end
-
-    if b["expires"] < 1 or b["timeremaning"] > 500000 then
-        self.expires = nil
-    else
-        self.expires = b["expires"]
-    end
-
-    if self.auraType == "debuff" then
-        if b["dispelType"] ~= nil then
-            self.background:SetVertexColor(
-                DEBUFF_COLOR[b["dispelType"]].r,
-                DEBUFF_COLOR[b["dispelType"]].g,
-                DEBUFF_COLOR[b["dispelType"]].b
-            )
-        else
-            self.background:SetVertexColor(COLOR_FRIENDLY[2].r, COLOR_FRIENDLY[2].g, COLOR_FRIENDLY[2].b)
-        end
-    else
-        if b["isStealable"] then
-            self.background:SetVertexColor(1, 1, 1)
-        else
-            self.background:SetVertexColor(0, 0, 0)
-        end
-    end
-
-    self.auraid = b["id"]
-    self.duration:SetText(duration)
-    self.stacks:SetText(stacks)
-    self.icon:SetTexture(b["icon"])
-
-    return true
-end
-GW.AddForProfiling("unitframes", "setBuffData", setBuffData)
+local fctf
 
 local function normalUnitFrame_OnEnter(self)
     if self.unit ~= nil then
-        GameTooltip:ClearLines()
         GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
         GameTooltip:SetUnit(self.unit)
         GameTooltip:Show()
@@ -203,14 +27,63 @@ local function normalUnitFrame_OnEnter(self)
 end
 GW.AddForProfiling("unitframes", "normalUnitFrame_OnEnter", normalUnitFrame_OnEnter)
 
-local function createNormalUnitFrame(ftype)
-    local f = CreateFrame("Button", ftype, UIParent, "GwNormalUnitFrame")
+local function createNormalUnitFrame(ftype, revert)
+    local f = CreateFrame("Button", ftype, UIParent, revert and "GwNormalUnitFrameInvert" or "GwNormalUnitFrame")
+    local hg = f.healthContainer
+    f.absorbOverlay = hg.healPrediction.absorbbg.health.antiHeal.absorbOverlay
+    f.antiHeal = hg.healPrediction.absorbbg.health.antiHeal
+    f.health = hg.healPrediction.absorbbg.health
+    f.absorbbg = hg.healPrediction.absorbbg
+    f.healPrediction = hg.healPrediction
+    f.healthString = hg.healPrediction.absorbbg.health.antiHeal.absorbOverlay.healthString
+
+    --GwTargetUnitFrame.health:GetValue()
+    GW.hookStatusbarBehaviour(f.absorbOverlay,true)
+    GW.hookStatusbarBehaviour(f.antiHeal,true)
+    GW.hookStatusbarBehaviour(f.health, true, nil)
+    GW.hookStatusbarBehaviour(f.absorbbg,true)
+    GW.hookStatusbarBehaviour(f.healPrediction,false)
+    GW.hookStatusbarBehaviour(f.castingbarNormal,false)
+    GW.hookStatusbarBehaviour(f.powerbar,true)
+
+    f.absorbOverlay.customMaskSize = 64
+    f.antiHeal.customMaskSize = 64
+    f.health.customMaskSize = 64
+    f.absorbbg.customMaskSize = 64
+    f.healPrediction.customMaskSize = 64
+    f.castingbarNormal.customMaskSize = 64
+    f.powerbar.customMaskSize = 64
+
+    f.absorbOverlay:SetStatusBarColor(1,1,1,0.66)
+    f.absorbbg:SetStatusBarColor(1,1,1,0.66)
+    f.healPrediction:SetStatusBarColor(0.58431,0.9372,0.2980,0.60)
+
+
+    f.frameInvert = revert
+
+    if revert then
+        f.healthString:ClearAllPoints()
+        f.healthString:SetPoint("RIGHT", f.absorbOverlay, "RIGHT", -5, 0)
+        f.healthString:SetJustifyH("RIGHT")
+
+        --f.absorbOverlay:SetReverseFill(true)
+        --f.antiHeal:SetReverseFill(true)
+        --f.health:SetReverseFill(true)
+        --f.absorbbg:SetReverseFill(true)
+        --f.healPrediction:SetReverseFill(true)
+        --f.powerbar:SetReverseFill(true)
+    end
 
     f.healthString:SetFont(UNIT_NAME_FONT, 11)
     f.healthString:SetShadowOffset(1, -1)
 
-    f.nameString:SetFont(UNIT_NAME_FONT, 14)
+    if GW.settings.FONTS_ENABLED then -- for any reason blizzard is not supporting UTF8 if we set this font
+        f.nameString:SetFont(UNIT_NAME_FONT, 14)
+    end
     f.nameString:SetShadowOffset(1, -1)
+
+    f.threatString:SetFont(STANDARD_TEXT_FONT, 11)
+    f.threatString:SetShadowOffset(1, -1)
 
     f.levelString:SetFont(UNIT_NAME_FONT, 14)
     f.levelString:SetShadowOffset(1, -1)
@@ -218,30 +91,69 @@ local function createNormalUnitFrame(ftype)
     f.castingString:SetFont(UNIT_NAME_FONT, 12)
     f.castingString:SetShadowOffset(1, -1)
 
+    f.castingbarNormal.castingString:SetFont(UNIT_NAME_FONT, 12)
+    f.castingbarNormal.castingString:SetShadowOffset(1, -1)
+
+    f.castingbarNormal.castingTimeString:SetFont(UNIT_NAME_FONT, 12)
+    f.castingbarNormal.castingTimeString:SetShadowOffset(1, -1)
+
+    f.castingTimeString:SetFont(UNIT_NAME_FONT, 12)
+    f.castingTimeString:SetShadowOffset(1, -1)
+
     f.prestigeString:SetFont(UNIT_NAME_FONT, 12, "OUTLINED")
 
     f.prestigebg:SetPoint("CENTER", f.prestigeString, "CENTER", -1, 1)
 
-    f.portrait:SetMask("Textures\\MinimapMask")
-
     f.healthValue = 0
 
-    f.barWidth = 212
+    f.barWidth = 214
 
     f:SetScript("OnEnter", normalUnitFrame_OnEnter)
     f:SetScript("OnLeave", GameTooltip_Hide)
 
     return f
 end
+GW.createNormalUnitFrame = createNormalUnitFrame
 GW.AddForProfiling("unitframes", "createNormalUnitFrame", createNormalUnitFrame)
 
-local function createNormalUnitFrameSmall()
-    local f = CreateFrame("Button", "GwTargetsTargetUnitFrame", UIParent, "GwNormalUnitFrameSmall")
+local function createNormalUnitFrameSmall(ftype)
+    local f = CreateFrame("Button", ftype, UIParent, "GwNormalUnitFrameSmall")
+    local hg = f.healthContainer
+    f.absorbOverlay = hg.healPrediction.absorbbg.health.antiHeal.absorbOverlay
+    f.antiHeal = hg.healPrediction.absorbbg.health.antiHeal
+    f.health = hg.healPrediction.absorbbg.health
+    f.absorbbg = hg.healPrediction.absorbbg
+    f.healPrediction = hg.healPrediction
+    f.healthString = hg.healPrediction.absorbbg.health.antiHeal.absorbOverlay.healthString
+
+
+    GW.hookStatusbarBehaviour(f.absorbOverlay,true)
+    GW.hookStatusbarBehaviour(f.antiHeal,true)
+    GW.hookStatusbarBehaviour(f.health,true)
+    GW.hookStatusbarBehaviour(f.absorbbg,true)
+    GW.hookStatusbarBehaviour(f.healPrediction,false)
+    GW.hookStatusbarBehaviour(f.castingbarNormal,false)
+    GW.hookStatusbarBehaviour(f.powerbar,true)
+
+    f.absorbOverlay.customMaskSize = 64
+    f.antiHeal.customMaskSize = 64
+    f.health.customMaskSize = 64
+    f.absorbbg.customMaskSize = 64
+    f.healPrediction.customMaskSize = 64
+    f.castingbarNormal.customMaskSize = 64
+    f.powerbar.customMaskSize = 64
+
+    f.absorbOverlay:SetStatusBarColor(1,1,1,0.66)
+    f.absorbbg:SetStatusBarColor(1,1,1,0.66)
+    f.healPrediction:SetStatusBarColor(0.58431,0.9372,0.2980,0.60)
+
 
     f.healthString:SetFont(UNIT_NAME_FONT, 11)
     f.healthString:SetShadowOffset(1, -1)
 
-    f.nameString:SetFont(UNIT_NAME_FONT, 14)
+    if GW.settings.FONTS_ENABLED then -- for any reason blizzard is not supporting UTF8 if we set this font
+        f.nameString:SetFont(UNIT_NAME_FONT, 14)
+    end
     f.nameString:SetShadowOffset(1, -1)
 
     f.levelString:SetFont(UNIT_NAME_FONT, 14)
@@ -250,9 +162,15 @@ local function createNormalUnitFrameSmall()
     f.castingString:SetFont(UNIT_NAME_FONT, 12)
     f.castingString:SetShadowOffset(1, -1)
 
+    f.castingbarNormal.castingString:SetFont(UNIT_NAME_FONT, 12)
+    f.castingbarNormal.castingString:SetShadowOffset(1, -1)
+
+    f.castingbarNormal.castingTimeString:SetFont(UNIT_NAME_FONT, 12)
+    f.castingbarNormal.castingTimeString:SetShadowOffset(1, -1)
+
     f.healthValue = 0
 
-    f.barWidth = 146
+    f.barWidth = 149
 
     f:SetScript("OnEnter", normalUnitFrame_OnEnter)
     f:SetScript("OnLeave", GameTooltip_Hide)
@@ -264,15 +182,16 @@ GW.AddForProfiling("unitframes", "createNormalUnitFrameSmall", createNormalUnitF
 local function updateHealthTextString(self, health, healthPrecentage)
     local healthString = ""
 
-    if self.showHealthValue == true then
+    if self.showHealthValue and self.showHealthPrecentage then
+        if not self.frameInvert then
+            healthString = CommaValue(health) .. " - " .. CommaValue(healthPrecentage * 100) .. "%"
+        else
+            healthString = CommaValue(healthPrecentage * 100) .. "% - " .. CommaValue(health)
+        end
+    elseif self.showHealthValue and not self.showHealthPrecentage then
         healthString = CommaValue(health)
-    end
-    if self.showHealthValue == true and self.showHealthPrecentage == true then
-        healthString = healthString .. " - "
-    end
-
-    if self.showHealthPrecentage == true then
-        healthString = healthString .. CommaValue(healthPrecentage * 100) .. "%"
+    elseif not self.showHealthValue and self.showHealthPrecentage then
+        healthString = CommaValue(healthPrecentage * 100) .. "%"
     end
 
     self.healthString:SetText(healthString)
@@ -280,68 +199,45 @@ end
 GW.AddForProfiling("unitframes", "updateHealthTextString", updateHealthTextString)
 
 local function updateHealthbarColor(self)
-    if self.classColor == true and UnitIsPlayer(self.unit) then
-        local _, _, classIndex = UnitClass(self.unit)
-        self.healthbar:SetVertexColor(
-            CLASS_COLORS_RAIDFRAME[classIndex].r,
-            CLASS_COLORS_RAIDFRAME[classIndex].g,
-            CLASS_COLORS_RAIDFRAME[classIndex].b,
-            1
-        )
-        self.healthbarSpark:SetVertexColor(
-            CLASS_COLORS_RAIDFRAME[classIndex].r,
-            CLASS_COLORS_RAIDFRAME[classIndex].g,
-            CLASS_COLORS_RAIDFRAME[classIndex].b,
-            1
-        )
-        self.healthbarFlash:SetVertexColor(
-            CLASS_COLORS_RAIDFRAME[classIndex].r,
-            CLASS_COLORS_RAIDFRAME[classIndex].g,
-            CLASS_COLORS_RAIDFRAME[classIndex].b,
-            1
-        )
-        self.healthbarFlashSpark:SetVertexColor(
-            CLASS_COLORS_RAIDFRAME[classIndex].r,
-            CLASS_COLORS_RAIDFRAME[classIndex].g,
-            CLASS_COLORS_RAIDFRAME[classIndex].b,
-            1
-        )
+    if self.classColor and (UnitIsPlayer(self.unit) or UnitInPartyIsAI(self.unit)) then
+        local _, englishClass = UnitClass(self.unit)
+        local color = GWGetClassColor(englishClass, true)
 
-        self.nameString:SetTextColor(
-            CLASS_COLORS_RAIDFRAME[classIndex].r,
-            CLASS_COLORS_RAIDFRAME[classIndex].g,
-            CLASS_COLORS_RAIDFRAME[classIndex].b,
-            1
-        )
+        self.health:SetStatusBarColor(color.r, color.g, color.b, color.a)
+      --  self.healthbar:SetVertexColor(color.r, color.g, color.b, color.a)
+      -- self.healthbarSpark:SetVertexColor(color.r, color.g, color.b, color.a)
+      --  self.healthbarFlash:SetVertexColor(color.r, color.g, color.b, color.a)
+      --  self.healthbarFlashSpark:SetVertexColor(color.r, color.g, color.b, color.a)
 
-        local r, g, b, _ = self.nameString:GetTextColor()
-        self.nameString:SetTextColor(r + 0.3, g + 0.3, b + 0.3, 1)
+        self.nameString:SetTextColor(color.r + 0.3, color.g + 0.3, color.b + 0.3, color.a)
     else
-        local isFriend = UnitIsFriend("player", self.unit)
-        local friendlyColor = COLOR_FRIENDLY[1]
+        local unitReaction = UnitReaction(self.unit, "player")
+        local nameColor = unitReaction and GW.FACTION_BAR_COLORS[unitReaction] or RAID_CLASS_COLORS.PRIEST
 
-        if isFriend ~= true then
-            friendlyColor = COLOR_FRIENDLY[2]
-        end
-        if UnitIsTapDenied("player") then
-            friendlyColor = COLOR_FRIENDLY[3]
+        if unitReaction then
+            if unitReaction <= 3 then nameColor = COLOR_FRIENDLY[2] end --Enemy
+            if unitReaction >= 5 then nameColor = COLOR_FRIENDLY[1] end --Friend
         end
 
-        self.healthbar:SetVertexColor(friendlyColor.r, friendlyColor.g, friendlyColor.b, 1)
-        self.healthbarSpark:SetVertexColor(friendlyColor.r, friendlyColor.g, friendlyColor.b, 1)
-        self.healthbarFlash:SetVertexColor(friendlyColor.r, friendlyColor.g, friendlyColor.b, 1)
-        self.healthbarFlashSpark:SetVertexColor(friendlyColor.r, friendlyColor.g, friendlyColor.b, 1)
-        self.nameString:SetTextColor(friendlyColor.r, friendlyColor.g, friendlyColor.b, 1)
+        if UnitIsTapDenied(self.unit) then
+            nameColor = {r = 159 / 255, g = 159 / 255, b = 159 / 255}
+        end
+        self.health:SetStatusBarColor(nameColor.r, nameColor.g, nameColor.b, 1)
+    --    self.healthbar:SetVertexColor(nameColor.r, nameColor.g, nameColor.b, 1)
+    --    self.healthbarSpark:SetVertexColor(nameColor.r, nameColor.g, nameColor.b, 1)
+    --    self.healthbarFlash:SetVertexColor(nameColor.r, nameColor.g, nameColor.b, 1)
+    --    self.healthbarFlashSpark:SetVertexColor(nameColor.r, nameColor.g, nameColor.b, 1)
+        self.nameString:SetTextColor(nameColor.r, nameColor.g, nameColor.b, 1)
     end
 
-    if (UnitLevel(self.unit) - UnitLevel("player")) <= -5 then
-        local r, g, b, _ = self.nameString:GetTextColor()
+    if (UnitLevel(self.unit) - GW.mylevel) <= -5 then
+        local r, g, b = self.nameString:GetTextColor()
         self.nameString:SetTextColor(r + 0.5, g + 0.5, b + 0.5, 1)
     end
 end
 GW.AddForProfiling("unitframes", "updateHealthbarColor", updateHealthbarColor)
 
-local function healthBarAnimation(self, powerPrec)
+local function healthBarAnimation(self, powerPrec, norm)
     local powerBarWidth = self.barWidth
     local bit = powerBarWidth / 12
     local spark = bit * math.floor(12 * (powerPrec))
@@ -349,67 +245,57 @@ local function healthBarAnimation(self, powerPrec)
 
     local bI = math.min(16, math.max(1, math.floor(17 - (16 * spark_current))))
 
-    self.healthbarFlashSpark:SetTexCoord(
-        bloodSpark[bI].left,
-        bloodSpark[bI].right,
+    local hb
+    local hbSpark
+    local hbbg = self.healthbarBackground
+    if (norm ~= nil) then
+        hb = self.healthbar
+        hbSpark = self.healthbarSpark
+    else
+        hb = self.healthbarFlash
+        hbSpark = self.healthbarFlashSpark
+    end
+
+    if powerPrec>=1 or powerPrec<=0 then
+      hbSpark:Hide()
+    else
+      hbSpark:Show()
+      hbSpark:SetWidth(powerBarWidth/12)
+    end
+
+    hbSpark:SetTexCoord(
+        self.frameInvert and bloodSpark[bI].right or bloodSpark[bI].left,
+        self.frameInvert and bloodSpark[bI].left or bloodSpark[bI].right,
         bloodSpark[bI].top,
         bloodSpark[bI].bottom
     )
-    self.healthbarFlashSpark:SetPoint(
-        "LEFT",
-        self.healthbarBackground,
-        "LEFT",
-        math.max(0, math.min(powerBarWidth - bit, math.floor(spark))),
+    hbSpark:SetPoint(
+        self.frameInvert and "RIGHT" or "LEFT",
+        hbbg,
+        self.frameInvert and "RIGHT" or "LEFT",
+        (math.max(0, math.min(powerBarWidth - bit, math.floor(spark))) - (self.frameInvert and 0.6 or 0)) * (self.frameInvert and -1 or 1),
         0
     )
-    self.healthbarFlash:SetPoint(
-        "RIGHT",
-        self.healthbarBackground,
-        "LEFT",
-        math.max(0, math.min(powerBarWidth, spark)) + 1,
+    hb:SetPoint(
+        self.frameInvert and "LEFT" or "RIGHT",
+        hbbg,
+        self.frameInvert and "RIGHT" or "LEFT",
+        (math.max(0, math.min(powerBarWidth, spark)) * (self.frameInvert and -1 or 1)), -- + (self.frameInvert and -1 or 1),
         0
     )
 end
+GW.healthBarAnimation = healthBarAnimation
 GW.AddForProfiling("unitframes", "healthBarAnimation", healthBarAnimation)
 
-local function healthBarAnimationNormal(self, powerPrec)
-    local powerBarWidth = self.barWidth
-    local bit = powerBarWidth / 12
-    local spark = bit * math.floor(12 * (powerPrec))
-    local spark_current = (bit * (12 * (powerPrec)) - spark) / bit
-
-    local bI = math.min(16, math.max(1, math.floor(17 - (16 * spark_current))))
-
-    self.healthbarSpark:SetTexCoord(
-        bloodSpark[bI].left,
-        bloodSpark[bI].right,
-        bloodSpark[bI].top,
-        bloodSpark[bI].bottom
-    )
-    self.healthbarSpark:SetPoint(
-        "LEFT",
-        self.healthbarBackground,
-        "LEFT",
-        math.max(0, math.min(powerBarWidth - bit, math.floor(spark))),
-        0
-    )
-    self.healthbar:SetPoint(
-        "RIGHT",
-        self.healthbarBackground,
-        "LEFT",
-        math.max(0, math.min(powerBarWidth, spark)) + 2,
-        0
-    )
-end
-GW.AddForProfiling("unitframes", "healthBarAnimationNormal", healthBarAnimationNormal)
-
-local function setUnitPortraitFrame(self, event)
+local function setUnitPortraitFrame(self)
     if self.portrait == nil or self.background == nil then
         return
     end
 
-    local txt = nil
+    local txt
     local border = "normal"
+    local showItemLevel = (GW.settings[self.unit .. "_SHOW_ILVL"] and CanInspect(self.unit))
+    local honorLevel = showItemLevel and 0 or UnitHonorLevel(self.unit)
 
     local unitClassIfication = UnitClassification(self.unit)
     if TARGET_FRAME_ART[unitClassIfication] ~= nil then
@@ -419,26 +305,27 @@ local function setUnitPortraitFrame(self, event)
         end
     end
 
-    if GetSetting(self.unit .. "_SHOW_ILVL") and CanInspect(self.unit) then
+    if showItemLevel then
         local guid = UnitGUID(self.unit)
-        if guid and unitIlvls[guid] then
-            txt = unitIlvls[guid]
+        if guid and GW.unitIlvlsCache[guid] and GW.unitIlvlsCache[guid].itemLevel then
+            txt = RoundDec(GW.unitIlvlsCache[guid].itemLevel, 0)
         end
-    elseif (UnitHonorLevel(self.unit) ~= nil and UnitHonorLevel(self.unit) > 9)   then
-        txt = UnitHonorLevel(self.unit)
-    
+    elseif honorLevel > 9 then
+        local plvl
+        txt = honorLevel
+
         if txt > 199 then
-			plvl = 4
-		elseif txt > 99 then
+            plvl = 4
+        elseif txt > 99 then
             plvl = 3
-        elseif txt > 49 then 
+        elseif txt > 49 then
             plvl = 2
         elseif txt > 9 then
             plvl = 1
         end
-        
-        key = 'prestige'..plvl
-        if TARGET_FRAME_ART[key]~=nil then
+
+        local key = "prestige" .. plvl
+        if TARGET_FRAME_ART[key] then
             border = key
         end
     end
@@ -452,63 +339,93 @@ local function setUnitPortraitFrame(self, event)
         self.prestigeString:Hide()
     end
 
+    --if DBM or BigWigs is load, check if target is a boss and set boss frame
+    local foundBossMod = false
+    if DBM and DBM.ModLists then
+        local npcId = GW.GetUnitCreatureId(self.unit)
+
+        for modId, _ in pairs(DBM.ModLists) do
+            for _, id in ipairs(DBM.ModLists[modId]) do
+                local mod = DBM:GetModByName(id)
+                if mod.creatureId and mod.creatureId == npcId then
+                    foundBossMod = true
+                    break
+                end
+            end
+            if foundBossMod then
+                break
+            end
+        end
+    elseif BigWigs then
+        local npcId = GW.GetUnitCreatureId(self.unit)
+        local BWMods = BigWigs:GetEnableMobs()
+        if BWMods[npcId] then
+            foundBossMod = true
+        end
+    end
+
+    if foundBossMod and border == "boss" then
+        border = "realboss"
+    elseif foundBossMod and border ~= "boss" then
+        border = "boss"
+    end
     self.background:SetTexture(TARGET_FRAME_ART[border])
 end
 GW.AddForProfiling("unitframes", "setUnitPortraitFrame", setUnitPortraitFrame)
 
-local function updateAvgItemLevel(self, event, guid)
+local function updateAvgItemLevel(self, guid)
     if guid == UnitGUID(self.unit) and CanInspect(self.unit) then
-        if UnitIsUnit(self.unit, "player") then
-            unitIlvls[guid] = floor((GetAverageItemLevel()))
-        else
-            local ilvl, n, retry = 0, 0
-            for i=INVSLOT_HEAD,INVSLOT_OFFHAND do
-                if i ~= INVSLOT_BODY then
-                    local tex = GetInventoryItemTexture(self.unit, i)
-                    local link = tex and GetInventoryItemLink(self.unit, i)
-                    local lvl =  link and GetRealItemLevel(link)
-                    if lvl then
-                        ilvl, n = ilvl + lvl, n + 1
-                    elseif tex then
-                        retry = true
+        local itemLevel, retryUnit, retryTable, iLevelDB = GW.GetUnitItemLevel(self.unit)
+        if itemLevel == "tooSoon" then
+            C_Timer.After(0.05, function()
+                local canUpdate = true
+                for _, x in ipairs(retryTable) do
+                    local slotInfo = GW.GetGearSlotInfo(retryUnit, x)
+                    if slotInfo == "tooSoon" then
+                        canUpdate = false
+                    else
+                        iLevelDB[x] = slotInfo.iLvl
+                        slotInfo = nil -- clear cache
                     end
                 end
-            end
-    
-            if retry and not unitIlvls[guid] then
-                C_Timer.After(0, function () NotifyInspect(self.unit) end)
-            elseif n > 0 then
-                unitIlvls[guid] = floor(ilvl / n)
-                ClearInspectPlayer()
-                self:UnregisterEvent("INSPECT_READY")
-            end
-        end
 
-        setUnitPortraitFrame(self, event)
+                if canUpdate then
+                    local calculateItemLevel = GW.CalculateAverageItemLevel(iLevelDB, retryUnit)
+                    PopulateUnitIlvlsCache(guid, calculateItemLevel)
+                    ClearInspectPlayer()
+                    self:UnregisterEvent("INSPECT_READY")
+                    setUnitPortraitFrame(self)
+                end
+            end)
+        else
+            PopulateUnitIlvlsCache(guid, itemLevel)
+            self:UnregisterEvent("INSPECT_READY")
+        end
+        setUnitPortraitFrame(self)
     end
 end
 GW.AddForProfiling("unitframes", "updateAvgItemLevel", updateAvgItemLevel)
 
-local function updateRaidMarkers(self, event)
+local function updateRaidMarkers(self)
     local i = GetRaidTargetIndex(self.unit)
     if i == nil then
         self.raidmarker:SetTexture(nil)
         return
     end
-    self.raidmarker:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_" .. i)
+    self.raidmarker:SetTexture("Interface/TargetingFrame/UI-RaidTargetingIcon_" .. i)
 end
 GW.AddForProfiling("unitframes", "updateRaidMarkers", updateRaidMarkers)
 
-local function setUnitPortrait(self, event)
-    if self.portrait == nil then
-        return
-    end
+local function setUnitPortrait(self)
     SetPortraitTexture(self.portrait, self.unit)
-    self.activePortrait = ""
+    if self.frameInvert then
+        self.portrait:SetTexCoord(1, 0, 0, 1)
+    end
+    self.activePortrait = nil
 end
 GW.AddForProfiling("unitframes", "setUnitPortrait", setUnitPortrait)
 
-local function unitFrameData(self, event)
+local function unitFrameData(self)
     local level = UnitLevel(self.unit)
     if level == -1 then
         level = "??"
@@ -517,7 +434,7 @@ local function unitFrameData(self, event)
     local name = UnitName(self.unit)
 
     if UnitIsGroupLeader(self.unit) then
-        name = "|TInterface\\AddOns\\GW2_UI\\textures\\party\\icon-groupleader:18:18|t" .. name
+        name = "|TInterface/AddOns/GW2_UI/textures/party/icon-groupleader:18:18|t" .. name
     end
 
     self.nameString:SetText(name)
@@ -525,15 +442,38 @@ local function unitFrameData(self, event)
 
     updateHealthbarColor(self)
 
-    setUnitPortraitFrame(self, event)
+    setUnitPortraitFrame(self)
 end
 GW.AddForProfiling("unitframes", "unitFrameData", unitFrameData)
 
 local function normalCastBarAnimation(self, powerPrec)
+
+  self.castingbarNormal:SetFillAmount(powerPrec)
+  --[[
+
+
     local powerBarWidth = self.barWidth
-    self.castingbarNormal:SetWidth(math.min(powerBarWidth, math.max(1, powerBarWidth * powerPrec)))
-    self.castingbarNormal:SetTexCoord(0, powerPrec, 0.25, 0.5)
-    self.castingbarNormalSpark:SetWidth(math.max(1, math.min(16, 16 * (powerPrec / 0.10))))
+    self.castingbarNormal:SetWidth(math.max(1, powerPrec * powerBarWidth))
+    self.castingbarNormalSpark:SetWidth(math.min(15, math.max(1, powerPrec * powerBarWidth)))
+    self.castingbarNormal:SetTexCoord(self.barCoords.L, GW.lerp(self.barCoords.L,self.barCoords.R, powerPrec), self.barCoords.T, self.barCoords.B)
+
+    self.castingbarNormal:SetVertexColor(1, 1, 1, 1)
+
+    if self.numStages > 0 then
+        for i = 1, self.numStages - 1, 1 do
+            local stage_percentage = self.StagePoints[i]
+            if stage_percentage <= powerPrec then
+                self.highlight:SetTexCoord(self.barHighLightCoords.L, GW.lerp(self.barHighLightCoords.L, self.barHighLightCoords.R, stage_percentage), self.barHighLightCoords.T, self.barHighLightCoords.B)
+                self.highlight:SetWidth(math.max(1, stage_percentage * powerBarWidth))
+                self.highlight:Show()
+            end
+
+            if i == 1 and stage_percentage >= powerPrec then
+                self.highlight:Hide()
+            end
+        end
+    end
+      ]]
 end
 GW.AddForProfiling("unitframes", "normalCastBarAnimation", normalCastBarAnimation)
 
@@ -549,51 +489,101 @@ local function protectedCastAnimation(self, powerPrec)
 
     self.castingbar:SetTexCoord(0, math.min(1, math.max(0, 0.0625 * segment)), 0, 1)
     self.castingbar:SetWidth(math.min(powerBarWidth, math.max(1, spark)))
+
+
+    --if self.numStages > 0 then
+    --    for i = 1, self.numStages - 1, 1 do
+    --        local stage_percentage = self.StagePoints[i]
+    --        if stage_percentage <= powerPrec then
+    --            self.highlight:SetTexCoord(self.barHighLightCoords.L, GW.lerp(self.barHighLightCoords.L, self.barHighLightCoords.R, stage_percentage), self.barHighLightCoords.T, self.barHighLightCoords.B)
+    --            self.highlight:SetWidth(math.max(1, stage_percentage * powerBarWidth))
+    --            self.highlight:Show()
+    --        end
+
+    --        if i == 1 and stage_percentage >= powerPrec then
+    --            self.highlight:Hide()
+    --        end
+    --    end
+    --end
 end
 GW.AddForProfiling("unitframes", "protectedCastAnimation", protectedCastAnimation)
 
-local function hideCastBar(self, event)
+local function hideCastBar(self)
     self.castingbarBackground:Hide()
     self.castingString:Hide()
+    self.highlight:Hide()
+
+    GW.ClearStages(self)
+
+    if self.castingTimeString then
+        self.castingTimeString:Hide()
+    end
 
     self.castingbar:Hide()
     self.castingbarSpark:Hide()
 
     self.castingbarNormal:Hide()
-    self.castingbarNormalSpark:Hide()
 
-    self.castingbarBackground:SetPoint("TOPLEFT", self.powerbarBackground, "BOTTOMLEFT", -2, 19)
+    self.castingbarBackground:ClearAllPoints()
+    self.castingbarBackground:SetPoint("TOPLEFT", self.powerbar, "BOTTOMLEFT", self.type == "NormalTarget" and -2 or 0, 19)
 
     if self.portrait ~= nil then
-        setUnitPortrait(self, event)
+        setUnitPortrait(self)
     end
 
-    if animations["GwUnitFrame" .. self.unit .. "Cast"] ~= nil then
-        animations["GwUnitFrame" .. self.unit .. "Cast"]["completed"] = true
-        animations["GwUnitFrame" .. self.unit .. "Cast"]["duration"] = 0
+    if animations["GwUnitFrame" .. self.unit .. "Cast"] then
+        animations["GwUnitFrame" .. self.unit .. "Cast"].completed = true
+        animations["GwUnitFrame" .. self.unit .. "Cast"].duration = 0
     end
 end
 GW.AddForProfiling("unitframes", "hideCastBar", hideCastBar)
 
-local function updateCastValues(self, event)
-    local castType = 1
+local function updateCastValues(self)
+    local numStages = 0
+    local barTexture = GW.CASTINGBAR_TEXTURES.YELLOW.NORMAL
+    local barHighlightTexture = GW.CASTINGBAR_TEXTURES.YELLOW.HIGHLIGHT
+
+    self.isCasting = true
+    self.isChanneling = false
+    self.reverseChanneling = false
 
     local name, _, texture, startTime, endTime, _, _, notInterruptible = UnitCastingInfo(self.unit)
 
     if name == nil then
-        name, _, texture, startTime, endTime, _, notInterruptible = UnitChannelInfo(self.unit)
-        castType = 0
+        name, _, texture, startTime, endTime, _, notInterruptible, _, _, numStages = UnitChannelInfo(self.unit)
+
+        self.isCasting = false
+        self.isChanneling = true
+        self.reverseChanneling = false
+
+        barTexture = GW.CASTINGBAR_TEXTURES.GREEN.NORMAL
+        barHighlightTexture = GW.CASTINGBAR_TEXTURES.GREEN.HIGHLIGHT
     end
 
-    if name == nil then
-        hideCastBar(self, event)
+    --WIP self.castingbarNormal:SetTexCoord(barTexture.L, barTexture.R, barTexture.T, barTexture.B)
+
+    local isChargeSpell = numStages and numStages > 0 or false
+
+    if isChargeSpell then
+        endTime = endTime + GetUnitEmpowerHoldAtMaxTime(self.unit)
+        self.isCasting = true
+        self.isChanneling = false
+        self.reverseChanneling = true
+    end
+
+    if name == nil or not self.showCastbar then
+        hideCastBar(self)
         return
     end
 
+    self.barCoords = barTexture
+    self.barHighLightCoords = barHighlightTexture
+    self.numStages = numStages and numStages + 1 or 0
+    self.maxValue = (endTime - startTime) / 1000
     startTime = startTime / 1000
     endTime = endTime / 1000
 
-    self.castingString:SetText(name)
+
 
     if texture ~= nil and self.portrait ~= nil and (self.activePortrait == nil or self.activePortrait ~= texture) then
         self.portrait:SetTexture(texture)
@@ -601,21 +591,41 @@ local function updateCastValues(self, event)
     end
 
     self.castingbarBackground:Show()
-    self.castingbarBackground:SetPoint("TOPLEFT", self.powerbarBackground, "BOTTOMLEFT", -2, -1)
+    self.castingbarBackground:ClearAllPoints()
+    self.castingbarBackground:SetPoint("TOPLEFT", self.powerbar, "BOTTOMLEFT", self.type == "NormalTarget" and -2 or 0, -1)
     self.castingString:Show()
+    if self.castingTimeString then
+        self.castingTimeString:Show()
+    end
 
     if notInterruptible then
+        self.castingString:SetText(name)
         self.castingbarNormal:Hide()
-        self.castingbarNormalSpark:Hide()
 
         self.castingbar:Show()
         self.castingbarSpark:Show()
+
+        self.castingString:Show();
+        if self.castingTimeString~=nil then
+          self.castingTimeString:Show();
+        end
     else
+        self.castingbarNormal.castingString:SetText(name)
+        self.castingString:Hide();
+        if self.castingTimeString~=nil then
+          self.castingTimeString:Hide();
+        end
+
         self.castingbar:Hide()
         self.castingbarSpark:Hide()
 
         self.castingbarNormal:Show()
-        self.castingbarNormalSpark:Show()
+    end
+
+    if self.reverseChanneling then
+        GW.AddStages(self, self.castingbarBackground, self.barWidth)
+    else
+        GW.ClearStages(self)
     end
 
     AddToAnimation(
@@ -624,14 +634,21 @@ local function updateCastValues(self, event)
         1,
         startTime,
         endTime - startTime,
-        function(step)
-            if castType == 0 then
-                step = 1 - step
+        function(p)
+            if self.showCastingbarData and self.castingTimeString then
+              if notInterruptible then
+                  self.castingTimeString:SetText(TimeCount(endTime - GetTime(), true))
+              else
+                  self.castingbarNormal.castingTimeString:SetText(TimeCount(endTime - GetTime(), true))
+              end
+
             end
+            p = self.isChanneling and (1 - p) or p
+
             if notInterruptible then
-                protectedCastAnimation(self, step)
+                protectedCastAnimation(self, p)
             else
-                normalCastBarAnimation(self, step)
+                normalCastBarAnimation(self, p)
             end
         end,
         "noease"
@@ -639,7 +656,7 @@ local function updateCastValues(self, event)
 end
 GW.AddForProfiling("unitframes", "updateCastValues", updateCastValues)
 
-local function updatePowerValues(self, event)
+local function updatePowerValues(self, hideAt0,event)
     local powerType, powerToken, _ = UnitPowerType(self.unit)
     local power = UnitPower(self.unit, powerType)
     local powerMax = UnitPowerMax(self.unit, powerType)
@@ -649,44 +666,51 @@ local function updatePowerValues(self, event)
         powerPrecentage = power / powerMax
     end
 
-    if power <= 0 then
-        self.powerbarBackground:Hide()
+    if power <= 0 and hideAt0 then
         self.powerbar:Hide()
     else
-        self.powerbarBackground:Show()
         self.powerbar:Show()
     end
 
     if PowerBarColorCustom[powerToken] then
         local pwcolor = PowerBarColorCustom[powerToken]
-        self.powerbar:SetVertexColor(pwcolor.r, pwcolor.g, pwcolor.b)
+        self.powerbar:SetStatusBarColor(pwcolor.r, pwcolor.g, pwcolor.b)
     end
 
-    self.powerbar:SetWidth(math.min(self.barWidth, math.max(1, self.barWidth * powerPrecentage)))
+    if event and event == "UNIT_TARGET" or event == "PLAYER_FOCUS_CHANGED" or event == "PLAYER_TARGET_CHANGED" then
+      self.powerbar:ForceFillAmount(powerPrecentage)
+    else
+      self.powerbar:SetFillAmount(powerPrecentage)
+    end
 end
+GW.updatePowerValues = updatePowerValues
 GW.AddForProfiling("unitframes", "updatePowerValues", updatePowerValues)
 
-local function setAbsorbValue(self, absorb, absorbPrecentage, healthPrecentage, health, healthMax)
-    local absorbAmount = healthPrecentage + absorbPrecentage
-    local absorbAmount2 = absorbPrecentage - (1 - healthPrecentage)
+local function updateThreatValues(self)
+    self.threatValue = select(3, UnitDetailedThreatSituation("player", self.unit))
 
-    self.absorbbarbg:SetWidth(math.min(self.barWidth, math.max(1, self.barWidth * absorbAmount)))
-    self.absorbbar:SetWidth(math.min(self.barWidth, math.max(1, self.barWidth * absorbAmount2)))
-
-    self.absorbbarbg:SetTexCoord(0, math.min(1, 1 * absorbAmount), 0, 1)
-    self.absorbbar:SetTexCoord(0, math.min(1, 1 * absorbAmount), 0, 1)
-
-    self.absorbbarbg:SetAlpha(math.max(0, math.min(1, (1 * (absorbPrecentage / 0.1)))))
-    self.absorbbar:SetAlpha(math.max(0, math.min(1, (1 * (absorbPrecentage / 0.1)))))
+    if self.threatValue == nil then
+        self.threatString:SetText("")
+        self.threattabbg:SetAlpha(0.0)
+    else
+        self.threatString:SetText(RoundDec(self.threatValue, 0) .. "%")
+        self.threattabbg:SetAlpha(1.0)
+    end
 end
-GW.AddForProfiling("unitframes", "setAbsorbValue", setAbsorbValue)
+GW.AddForProfiling("unitframes", "updateThreatValues", updateThreatValues)
 
 local function updateHealthValues(self, event)
     local health = UnitHealth(self.unit)
     local healthMax = UnitHealthMax(self.unit)
-    local healthPrecentage = 0
     local absorb = UnitGetTotalAbsorbs(self.unit)
+    local prediction = UnitGetIncomingHeals(self.unit) or 0
+    local healAbsorb =  UnitGetTotalHealAbsorbs(self.unit)
     local absorbPrecentage = 0
+    local absorbAmount = 0
+    local absorbAmount2 = 0
+    local predictionPrecentage = 0
+    local healAbsorbPrecentage = 0
+    local healthPrecentage = 0
 
     if health > 0 and healthMax > 0 then
         healthPrecentage = health / healthMax
@@ -694,596 +718,307 @@ local function updateHealthValues(self, event)
 
     if absorb > 0 and healthMax > 0 then
         absorbPrecentage = absorb / healthMax
+        absorbAmount = healthPrecentage + absorbPrecentage
+        absorbAmount2 = absorbPrecentage - (1 - healthPrecentage)
     end
 
-    if self.healthTextThroth == nil then
-        self.healthTextThroth = 0
+    if prediction > 0 and healthMax > 0 then
+        predictionPrecentage = (prediction / healthMax) + healthPrecentage
+    end
+    if healAbsorb > 0 and healthMax > 0 then
+        healAbsorbPrecentage = min(healthMax,healAbsorb / healthMax)
+    end
+    self.healPrediction:SetFillAmount(predictionPrecentage)
+
+    self.health.barOnUpdate = function()
+      updateHealthTextString(self, health, self.health:GetFillAmount())
     end
 
-    local animationSpeed = Diff(self.healthValue, healthPrecentage)
-    animationSpeed = math.min(1.00, math.max(0.2, 2.00 * animationSpeed))
-
-    if event == "UNIT_TARGET_CHANGED" or event == "FOCUS_TARGET_CHANGED" or event == "PLAYER_TARGET_CHANGED" then
-        animationSpeed = 0
+    if event == "UNIT_TARGET" or event == "PLAYER_FOCUS_CHANGED" or event == "PLAYER_TARGET_CHANGED" then
+        self.health:ForceFillAmount(healthPrecentage)
+        self.absorbbg:ForceFillAmount(absorbAmount)
+        self.absorbOverlay:ForceFillAmount(absorbAmount2)
+        self.antiHeal:ForceFillAmount(healAbsorbPrecentage)
+    else
+        self.health:SetFillAmount(healthPrecentage)
+        self.absorbbg:SetFillAmount(absorbAmount)
+        self.absorbOverlay:SetFillAmount(absorbAmount2)
+        self.antiHeal:SetFillAmount(healAbsorbPrecentage)
     end
-
-    setAbsorbValue(self, absorb, absorbPrecentage, healthPrecentage, health, healthMax)
-
-    healthBarAnimationNormal(self, healthPrecentage)
-
-    AddToAnimation(
-        self:GetName() .. self.unit,
-        self.healthValue,
-        healthPrecentage,
-        GetTime(),
-        animationSpeed,
-        function(step)
-            healthBarAnimation(self, step)
-
-            if self.healthTextThroth < GetTime() then
-                self.healthTextThroth = GetTime() + 0.1
-                updateHealthTextString(self, healthMax * step, step)
-            end
-            self.healthValue = step
-        end,
-        nil,
-        function()
-            updateHealthTextString(self, health, healthPrecentage)
-        end
-    )
 end
 GW.AddForProfiling("unitframes", "updateHealthValues", updateHealthValues)
 
-local function auraAnimateIn(self)
-    local endWidth = self:GetWidth()
-
-    AddToAnimation(
-        self:GetName(),
-        endWidth * 2,
-        endWidth,
-        GetTime(),
-        0.2,
-        function(step)
-            self:SetSize(step, step)
-        end
-    )
-end
-GW.AddForProfiling("unitframes", "auraAnimateIn", auraAnimateIn)
-
-local function UpdateBuffLayout(self, event, anchorPos)
-    local minIndex = 1
-    local maxIndex = 80
-
-    local isPlayer = false
-    if anchorPos and anchorPos == "player" then
-        isPlayer = true
-    elseif anchorPos ~= "player" then
-        if self.displayBuffs ~= true then
-            minIndex = 40
-        end
-        if self.displayDebuffs ~= true then
-            maxIndex = 40
-        end
-    end
-
-    local marginX = 3
-    local marginY = 20
-
-    local usedWidth = 0
-    local usedHeight = 0
-
-    local smallSize
-    local bigSize
-    local maxSize
-
-    if isPlayer then
-        maxSize = self:GetWidth()
-        smallSize = 28
-        bigSize = 32
-    else
-        maxSize = self.auras:GetWidth()
-        smallSize = 20
-        bigSize = 28
-    end
-
-    local lineSize = smallSize
-
-    local auraList = getBuffs(self.unit)
-    local debuffList = getDebuffs(self.unit, self.debuffFilter)
-
-    local saveAuras = {}
-
-    saveAuras["buff"] = {}
-    saveAuras["debuff"] = {}
-
-    local fUnit
-    if isPlayer then
-        fUnit = "player"
-    else
-        fUnit = self.unit
-    end
-
-    for frameIndex = minIndex, maxIndex do
-        local index
-        if isPlayer then
-            index = 41 - frameIndex
-        else
-            index = frameIndex
-        end
-        local list = auraList
-        local newAura = true
-
-        if frameIndex > 40 then
-            if isPlayer then
-                index = 41 - (frameIndex - 40)
-            else
-                index = frameIndex - 40
-            end
-        end
-
-        local frame = _G["Gw" .. fUnit .. "buffFrame" .. index]
-
-        if frameIndex > 40 then
-            frame = _G["Gw" .. fUnit .. "debuffFrame" .. index]
-            list = debuffList
-        end
-
-        if frameIndex == 41 then
-            usedWidth = 0
-            usedHeight = usedHeight + lineSize + marginY
-            lineSize = smallSize
-        end
-
-        if setBuffData(frame, list, index) then
-            if not frame:IsShown() then
-                frame:Show()
-            end
-
-            local isBig = frame.typeAura == "bigBuff"
-
-            local size = smallSize
-            if isBig then
-                size = bigSize
-                lineSize = bigSize
-
-                for k, v in pairs(self.saveAuras[frame.auraType]) do
-                    if v == list[index]["name"] then
-                        newAura = false
-                    end
-                end
-                self.animating = false
-                saveAuras[frame.auraType][#saveAuras[frame.auraType] + 1] = list[index]["name"]
-            end
-
-            local px = usedWidth + (size / 2)
-            local py = usedHeight + (size / 2)
-            if not anchorPos then
-                frame:SetPoint("CENTER", self.auras, "TOPLEFT", px, -py)
-            elseif anchorPos == "pet" then
-                frame:SetPoint("CENTER", self.auras, "BOTTOMRIGHT", -px, py)
-            elseif anchorPos == "player" then
-                frame:SetPoint("CENTER", self, "BOTTOMRIGHT", -px, py)
-            end
-
-            frame:SetSize(size, size)
-            if newAura and isBig and event == "UNIT_AURA" then
-                auraAnimateIn(frame)
-            end
-
-            usedWidth = usedWidth + size + marginX
-            if maxSize < usedWidth then
-                usedWidth = 0
-                usedHeight = usedHeight + lineSize + marginY
-                lineSize = smallSize
-            end
-        elseif frame and frame:IsShown() then
-            frame:Hide()
-        end
-    end
-
-    self.saveAuras = saveAuras
-end
-GW.UpdateBuffLayout = UpdateBuffLayout
-
-local function auraFrame_OnUpdate(self, elapsed)
-    if self.throt < 0 and self.expires ~= nil and self:IsShown() then
-        self.throt = 0.2
-        self.duration:SetText(TimeCount(self.expires - GetTime()))
-    else
-        self.throt = self.throt - elapsed
-    end
-end
-GW.AddForProfiling("unitframes", "auraFrame_OnUpdate", auraFrame_OnUpdate)
-
-local function auraFrame_OnEnter(self)
-    if self:IsShown() and self.auraid ~= nil and self.unit ~= nil then
-        GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
-        GameTooltip:ClearLines()
-        if self.auraType == "buff" then
-            GameTooltip:SetUnitBuff(self.unit, self.auraid)
-        else
-            GameTooltip:SetUnitDebuff(self.unit, self.auraid, self.debuffFilter)
-        end
-        GameTooltip:Show()
-    end
-end
-GW.AddForProfiling("unitframes", "auraFrame_OnEnter", auraFrame_OnEnter)
-
-local function auraFrame_OnClick(self, button, down)
-    if not InCombatLockdown() and self.auraType == "buff" and button == "RightButton" and self.unit == "player" then
-        CancelUnitBuff("player", self.auraid)
-    end
-end
-GW.AddForProfiling("unitframes", "auraFrame_OnClick", auraFrame_OnClick)
-
-local function CreateAuraFrame(name, parent)
-    local f = CreateFrame("Button", name, parent, "GwAuraFrame")
-    local fs = f.status
-
-    f.typeAura = "smallbuff"
-    f.cooldown:SetDrawEdge(0)
-    f.cooldown:SetDrawSwipe(1)
-    f.cooldown:SetReverse(false)
-    f.cooldown:SetHideCountdownNumbers(true)
-    f.throt = -1
-
-    fs.stacks:SetFont(UNIT_NAME_FONT, 11, "OUTLINED")
-    fs.duration:SetFont(UNIT_NAME_FONT, 10)
-    fs.duration:SetShadowOffset(1, -1)
-
-    fs:GetParent().duration = fs.duration
-    fs:GetParent().stacks = fs.stacks
-    fs:GetParent().icon = fs.icon
-
-    f:SetScript("OnUpdate", auraFrame_OnUpdate)
-    f:SetScript("OnEnter", auraFrame_OnEnter)
-    f:SetScript("OnLeave", GameTooltip_Hide)
-    f:SetScript("OnClick", auraFrame_OnClick)
-    --f:SetAttribute('type2', 'cancelaura')
-
-    return f
-end
-GW.CreateAuraFrame = CreateAuraFrame
-
-local function LoadAuras(f, a, u)
-    local unit = u or f.unit
-    for i = 1, 40 do
-        local frame = CreateAuraFrame("Gw" .. unit .. "buffFrame" .. i, a)
-        frame.unit = unit
-        frame.auraType = "buff"
-        frame = CreateAuraFrame("Gw" .. unit .. "debuffFrame" .. i, a)
-        frame.unit = unit
-        frame.auraType = "debuff"
-    end
-    f.saveAuras = {}
-    f.saveAuras["buff"] = {}
-    f.saveAuras["debuff"] = {}
-end
-GW.LoadAuras = LoadAuras
-
 local function target_OnEvent(self, event, unit)
-    if IsIn(event, "PLAYER_TARGET_CHANGED", "ZONE_CHANGED") then
-        if event == "PLAYER_TARGET_CHANGED" and CanInspect(self.unit) and GetSetting("target_SHOW_ILVL") then
+    local ttf = GwTargetTargetUnitFrame
+
+    if IsIn(event, "PLAYER_TARGET_CHANGED", "ZONE_CHANGED", "FORCE_UPDATE") then
+        if event == "PLAYER_TARGET_CHANGED" and CanInspect(self.unit) and GW.settings.target_SHOW_ILVL then
             local guid = UnitGUID(self.unit)
             if guid then
-                if IsShiftKeyDown() then
-                    unitIlvls[guid] = nil
-                end
-                if not unitIlvls[guid] then
+                if not GW.unitIlvlsCache[guid] then
+                    local _, englishClass = UnitClass(self.unit)
+                    local color = GWGetClassColor(englishClass, true, true)
+                    GW.unitIlvlsCache[guid] = {unitColor = {color.r, color.g, color.b}}
                     self:RegisterEvent("INSPECT_READY")
                     NotifyInspect(self.unit)
                 end
             end
         end
-
-        self.stepOnUpdate = 0
-        self:SetScript(
-            "OnUpdate",
-            function()
-                self.stepOnUpdate = self.stepOnUpdate + 1
-
-                if self.stepOnUpdate == 1 then
-                    updateHealthValues(self, event)
-                    return
-                end
-                if self.stepOnUpdate == 2 then
-                    unitFrameData(self, event)
-                    return
-                end
-                if self.stepOnUpdate == 3 then
-                    updatePowerValues(self, event)
-                    return
-                end
-                if self.stepOnUpdate == 4 then
-                    updateCastValues(self, event)
-                    return
-                end
-                if self.stepOnUpdate == 5 then
-                    updateRaidMarkers(self, event)
-                    return
-                end
-                if self.stepOnUpdate == 6 then
-                    UpdateBuffLayout(self, event)
-                    return
-                end
-
-                if self.stepOnUpdate == 7 then
-                    self:SetScript("OnUpdate", nil)
-                    return
-                end
-            end
-        )
-    elseif event == "PLAYER_ENTERING_WORLD" then
-        wipe(unitIlvls)
-    elseif event == "RAID_TARGET_UPDATE" then
-        updateRaidMarkers(self, event)
-    elseif event == "INSPECT_READY" then
-        if not GetSetting("target_SHOW_ILVL") then
-            self:UnregisterEvent("INSPECT_READY")
-            ClearInspectPlayer()
-        else
-            updateAvgItemLevel(self, event, unit)
+        if self.showThreat then
+            updateThreatValues(self)
+        elseif self.threattabbg:IsShown() then
+            self.threattabbg:Hide()
         end
-    elseif unit == self.unit then
+
+        unitFrameData(self)
+        if (ttf) then unitFrameData(ttf) end
+        updateHealthValues(self, event)
+        if (ttf) then updateHealthValues(ttf, event) end
+        updatePowerValues(self,nil,event)
+        if (ttf) then updatePowerValues(ttf,nil,event) end
+        updateCastValues(self)
+        if (ttf) then updateCastValues(ttf) end
+        updateRaidMarkers(self)
+        if (ttf) then updateRaidMarkers(ttf) end
+        UpdateBuffLayout(self, event)
+
+        if event == "PLAYER_TARGET_CHANGED" then
+            if UnitExists(self.unit) and not C_PlayerInteractionManager.IsReplacingUnit() then
+                if UnitIsEnemy(self.unit, "player") then
+                    PlaySound(SOUNDKIT.IG_CREATURE_AGGRO_SELECT)
+                elseif UnitIsFriend("player", self.unit) then
+                    PlaySound(SOUNDKIT.IG_CHARACTER_NPC_SELECT)
+                else
+                    PlaySound(SOUNDKIT.IG_CREATURE_NEUTRAL_SELECT)
+                end
+            else
+                PlaySound(SOUNDKIT.INTERFACE_SOUND_LOST_TARGET_UNIT)
+            end
+        end
+    elseif event == "UNIT_TARGET" and unit == "target" then
+        if (ttf ~= nil) then
+            if UnitExists("targettarget") then
+                unitFrameData(ttf)
+                updateHealthValues(ttf, event)
+                updatePowerValues(ttf,nil,event)
+                updateCastValues(ttf)
+                updateRaidMarkers(ttf)
+            end
+        end
+    elseif event == "PLAYER_ENTERING_WORLD" then
+        wipe(GW.unitIlvlsCache)
+    elseif event == "RAID_TARGET_UPDATE" then
+        updateRaidMarkers(self)
+        if (ttf) then updateRaidMarkers(ttf) end
+    elseif event == "INSPECT_READY" then
+        if not GW.settings.target_SHOW_ILVL then
+            self:UnregisterEvent("INSPECT_READY")
+        else
+            updateAvgItemLevel(self, unit)
+        end
+    elseif event == "UNIT_THREAT_LIST_UPDATE" and self.showThreat then
+        updateThreatValues(self)
+    elseif UnitIsUnit(unit, self.unit) then
         if event == "UNIT_AURA" then
             UpdateBuffLayout(self, event)
-        elseif IsIn(event, "UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_ABSORB_AMOUNT_CHANGED", "UNIT_HEALTH_FREQUENT") then
+        elseif IsIn(event, "UNIT_MAXHEALTH", "UNIT_ABSORB_AMOUNT_CHANGED", "UNIT_HEALTH", "UNIT_HEAL_PREDICTION") then
             updateHealthValues(self, event)
         elseif IsIn(event, "UNIT_MAXPOWER", "UNIT_POWER_FREQUENT") then
-            updatePowerValues(self, event)
-        elseif IsIn(event, "UNIT_SPELLCAST_START", "UNIT_SPELLCAST_CHANNEL_START") then
-            updateCastValues(self, event)
-        elseif IsIn(event, "UNIT_SPELLCAST_CHANNEL_STOP", "UNIT_SPELLCAST_STOP", "UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_FAILED") then
-            hideCastBar(self, event)
+            updatePowerValues(self,nil,event)
+        elseif IsIn(event, "UNIT_SPELLCAST_START", "UNIT_SPELLCAST_CHANNEL_START", "UNIT_SPELLCAST_EMPOWER_START") then
+            updateCastValues(self)
+        elseif IsIn(event, "UNIT_SPELLCAST_CHANNEL_STOP", "UNIT_SPELLCAST_STOP", "UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_FAILED", "UNIT_SPELLCAST_EMPOWER_STOP") then
+            hideCastBar(self)
+        elseif event == "UNIT_FACTION" then
+            updateHealthbarColor(self)
         end
     end
 end
 GW.AddForProfiling("unitframes", "target_OnEvent", target_OnEvent)
 
 local function focus_OnEvent(self, event, unit)
-    if event == "PLAYER_FOCUS_CHANGED" or event == "ZONE_CHANGED" then
-        self.stepOnUpdate = 0
-        self:SetScript(
-            "OnUpdate",
-            function()
-                self.stepOnUpdate = self.stepOnUpdate + 1
+    local ttf = GwFocusTargetUnitFrame
 
-                if self.stepOnUpdate == 1 then
-                    updateHealthValues(self, event)
-                    return
-                end
-                if self.stepOnUpdate == 2 then
-                    unitFrameData(self, event)
-                    return
-                end
-                if self.stepOnUpdate == 3 then
-                    updatePowerValues(self, event)
-                    return
-                end
-                if self.stepOnUpdate == 4 then
-                    updateCastValues(self, event)
-                    return
-                end
-                if self.stepOnUpdate == 5 then
-                    updateRaidMarkers(self, event)
-                    return
-                end
-                if self.stepOnUpdate == 6 then
-                    UpdateBuffLayout(self, event)
-                    return
-                end
-
-                if self.stepOnUpdate == 7 then
-                    self:SetScript("OnUpdate", nil)
-                    return
-                end
-            end
-        )
-        return
-    end
-
-    if
-        (event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH" or event == "UNIT_HEALTH_FREQUENT" or event == "UNIT_ABSORB_AMOUNT_CHANGED") and
-            unit == self.unit
-     then
+    if event == "PLAYER_FOCUS_CHANGED" or event == "ZONE_CHANGED" or event == "FORCE_UPDATE" then
+        unitFrameData(self)
+        if (ttf) then unitFrameData(ttf) end
         updateHealthValues(self, event)
-        return
-    end
-
-    if (event == "UNIT_MAXPOWER" or event == "UNIT_POWER_FREQUENT") and unit == self.unit then
-        updatePowerValues(self, event)
-        return
-    end
-
-    if (event == "UNIT_SPELLCAST_START" or event == "UNIT_SPELLCAST_CHANNEL_START") and unit == self.unit then
-        updateCastValues(self, event)
-        return
-    end
-
-    if
-        (event == "UNIT_SPELLCAST_CHANNEL_STOP" or event == "UNIT_SPELLCAST_STOP" or
-            event == "UNIT_SPELLCAST_INTERRUPTED" or
-            event == "UNIT_SPELLCAST_FAILED") and
-            unit == self.unit
-     then
-        hideCastBar(self, event)
-        return
-    end
-
-    if event == "RAID_TARGET_UPDATE" then
-        updateRaidMarkers(self, event)
-    end
-
-    if event == "UNIT_AURA" and unit == self.unit then
+        if (ttf) then updateHealthValues(ttf, event) end
+        updatePowerValues(self,nil,event)
+        if (ttf) then updatePowerValues(ttf,nil,event) end
+        updateCastValues(self)
+        if (ttf) then updateCastValues(ttf) end
+        updateRaidMarkers(self)
+        if (ttf) then updateRaidMarkers(ttf) end
         UpdateBuffLayout(self, event)
+
+        if event == "PLAYER_FOCUS_CHANGED" then
+            if UnitExists(self.unit) and not C_PlayerInteractionManager.IsReplacingUnit() then
+                if UnitIsEnemy(self.unit, "player") then
+                    PlaySound(SOUNDKIT.IG_CREATURE_AGGRO_SELECT)
+                elseif UnitIsFriend("player", self.unit) then
+                    PlaySound(SOUNDKIT.IG_CHARACTER_NPC_SELECT)
+                else
+                    PlaySound(SOUNDKIT.IG_CREATURE_NEUTRAL_SELECT)
+                end
+            else
+                PlaySound(SOUNDKIT.INTERFACE_SOUND_LOST_TARGET_UNIT)
+            end
+        end
+    elseif event == "UNIT_TARGET" and unit == "focus" then
+        if (ttf ~= nil) then
+            if UnitExists("focustarget") then
+                unitFrameData(ttf)
+                updateHealthValues(ttf, event)
+                updatePowerValues(ttf,nil,event)
+                updateCastValues(ttf)
+                updateRaidMarkers(ttf)
+            end
+        end
+    elseif event == "RAID_TARGET_UPDATE" then
+        updateRaidMarkers(self)
+    elseif UnitIsUnit(unit, self.unit) then
+        if event == "UNIT_AURA" then
+            UpdateBuffLayout(self, event)
+        elseif IsIn(event, "UNIT_MAXHEALTH", "UNIT_ABSORB_AMOUNT_CHANGED", "UNIT_HEALTH", "UNIT_HEAL_PREDICTION") then
+            updateHealthValues(self, event)
+        elseif IsIn(event, "UNIT_MAXPOWER", "UNIT_POWER_FREQUENT") then
+            updatePowerValues(self,nil,event)
+        elseif IsIn(event, "UNIT_SPELLCAST_START", "UNIT_SPELLCAST_CHANNEL_START", "UNIT_SPELLCAST_EMPOWER_START") then
+            updateCastValues(self)
+        elseif IsIn(event, "UNIT_SPELLCAST_CHANNEL_STOP", "UNIT_SPELLCAST_STOP", "UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_FAILED", "UNIT_SPELLCAST_EMPOWER_STOP") then
+            hideCastBar(self)
+        elseif event == "UNIT_FACTION" then
+            updateHealthbarColor(self)
+        end
     end
 end
 GW.AddForProfiling("unitframes", "focus_OnEvent", focus_OnEvent)
 
-local function targettarget_OnEvent(self, event, unit, arg2)
+local function unittarget_OnUpdate(self, elapsed)
+    if self.unit == nil then
+        return
+    end
+    if self.totalElapsed > 0 then
+        self.totalElapsed = self.totalElapsed - elapsed
+        return
+    end
+    self.totalElapsed = 0.25
     if not UnitExists(self.unit) then
         return
     end
 
-    if (event == "UNIT_TARGET" and unit == "target") or event == "PLAYER_TARGET_CHANGED" or event == "ZONE_CHANGED" then
-        self.stepOnUpdate = 0
-        self:SetScript(
-            "OnUpdate",
-            function()
-                self.stepOnUpdate = self.stepOnUpdate + 1
+    updateRaidMarkers(self)
+    updateHealthValues(self, "UNIT_TARGET")
+    updatePowerValues(self,nil,"UNIT_TARGET")
+    updateCastValues(self)
+end
+GW.AddForProfiling("unitframes", "unittarget_OnUpdate", unittarget_OnUpdate)
 
-                if self.stepOnUpdate == 1 then
-                    updateHealthValues(self, event)
-                    return
-                end
-                if self.stepOnUpdate == 2 then
-                    unitFrameData(self, event)
-                    return
-                end
-                if self.stepOnUpdate == 3 then
-                    updatePowerValues(self, event)
-                    return
-                end
-                if self.stepOnUpdate == 4 then
-                    updateCastValues(self, event)
-                    return
-                end
-                if self.stepOnUpdate == 5 then
-                    updateRaidMarkers(self, event)
-                    return
-                end
+local function ToggleTargetFrameSettings()
+    GwTargetUnitFrame.classColor = GW.settings.target_CLASS_COLOR
 
-                if self.stepOnUpdate == 6 then
-                    self:SetScript("OnUpdate", nil)
-                    return
-                end
-            end
-        )
-        return
+    GwTargetUnitFrame.showHealthValue = GW.settings.target_HEALTH_VALUE_ENABLED
+    GwTargetUnitFrame.showHealthPrecentage = GW.settings.target_HEALTH_VALUE_TYPE
+    GwTargetUnitFrame.showCastbar = GW.settings.target_SHOW_CASTBAR
+    GwTargetUnitFrame.showCastingbarData = GW.settings.target_CASTINGBAR_DATA
+
+    GwTargetUnitFrame.displayBuffs = GW.settings.target_BUFFS
+    GwTargetUnitFrame.displayDebuffs = GW.settings.target_DEBUFFS
+
+    GwTargetUnitFrame.showThreat = GW.settings.target_THREAT_VALUE_ENABLED
+
+    GwTargetUnitFrame.auraPositionTop = GW.settings.target_AURAS_ON_TOP
+
+    GwTargetUnitFrame.altBg:SetShown(GW.settings.target_FRAME_ALT_BACKGROUND)
+
+    GwTargetUnitFrame.auras:ClearAllPoints()
+    GwTargetUnitFrame.auras:SetPoint("TOPLEFT", GwTargetUnitFrame.castingbarBackground, "BOTTOMLEFT", 2, -15)
+
+    if GwTargetUnitFrame.auraPositionTop then
+        local yOff = GW.settings.target_FRAME_ALT_BACKGROUND and 22 or 17
+
+        GwTargetUnitFrame.auras:ClearAllPoints()
+        if GwTargetUnitFrame.frameInvert then
+            GwTargetUnitFrame.auras:SetPoint("TOPRIGHT", GwTargetUnitFrame.nameString, "TOPRIGHT", -2, yOff)
+        else
+            GwTargetUnitFrame.auras:SetPoint("TOPLEFT", GwTargetUnitFrame.nameString, "TOPLEFT", 2, yOff)
+        end
+    elseif GW.settings.target_HOOK_COMBOPOINTS and (GW.myClassID == 4 or GW.myClassID == 11) then
+        GwTargetUnitFrame.auras:ClearAllPoints()
+        GwTargetUnitFrame.auras:SetPoint("TOPLEFT", GwTargetUnitFrame.castingbarBackground, "BOTTOMLEFT", 2, -23)
     end
 
-    if (event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH" or event == "UNIT_HEALTH_FREQUENT" or event == "UNIT_ABSORB_AMOUNT_CHANGED") then
-        updateHealthValues(self, event)
-        return
+    -- priority: All > Important > Player
+    GwTargetUnitFrame.debuffFilter = "PLAYER"
+    if GW.settings.target_BUFFS_FILTER_IMPORTANT then
+        GwTargetUnitFrame.debuffFilter = "IMPORTANT"
+    end
+    if GW.settings.target_BUFFS_FILTER_ALL then
+        GwTargetUnitFrame.debuffFilter = nil
     end
 
-    if (event == "UNIT_MAXPOWER" or event == "UNIT_POWER_FREQUENT") then
-        updatePowerValues(self, event)
-        return
-    end
+    target_OnEvent(GwTargetUnitFrame, "FORCE_UPDATE")
+end
+GW.ToggleTargetFrameSettings = ToggleTargetFrameSettings
 
-    if (event == "UNIT_SPELLCAST_START" or event == "UNIT_SPELLCAST_CHANNEL_START") then
-        updateCastValues(self, event)
-        return
-    end
+local function ToggleTargetFrameCombatFeedback()
+    if GW.settings.target_FLOATING_COMBAT_TEXT then
+        if not fctf then
+            fctf = CreateFrame("Frame", nil, GwTargetUnitFrame)
+            fctf:SetFrameLevel(GwTargetUnitFrame:GetFrameLevel() + 3)
+            fctf:SetScript("OnEvent", function(self, _, unit, ...)
+                if self.unit == unit then
+                    CombatFeedback_OnCombatEvent(self, ...)
+                end
+            end)
+            local font = fctf:CreateFontString(nil, "OVERLAY")
+            font:SetFont(DAMAGE_TEXT_FONT, 30, "")
+            fctf.fontString = font
+            font:SetPoint("CENTER", GwTargetUnitFrame.portrait, "CENTER")
+            font:Hide()
 
-    if
-        (event == "UNIT_SPELLCAST_CHANNEL_STOP" or event == "UNIT_SPELLCAST_STOP" or
-            event == "UNIT_SPELLCAST_INTERRUPTED" or
-            event == "UNIT_SPELLCAST_FAILED")
-     then
-        hideCastBar(self, event)
-        return
-    end
-
-    if event == "RAID_TARGET_UPDATE" then
-        updateRaidMarkers(self, event)
+            fctf.unit = GwTargetUnitFrame.unit
+            CombatFeedback_Initialize(fctf, fctf.fontString, 30)
+        end
+        fctf:RegisterEvent("UNIT_COMBAT")
+        fctf:SetScript("OnUpdate", CombatFeedback_OnUpdate)
+    else
+        if fctf then
+            fctf:UnregisterAllEvents()
+            fctf:SetScript("OnUpdate", nil)
+        end
     end
 end
-GW.AddForProfiling("unitframes", "targettarget_OnEvent", targettarget_OnEvent)
-
-local function focustarget_OnEvent(self, event, unit, arg2)
-    if not UnitExists(self.unit) then
-        return
-    end
-
-    if
-        (event == "UNIT_TARGET" and unit == "focustarget") or event == "PLAYER_TARGET_CHANGED" or
-            event == "PLAYER_FOCUS_CHANGED" or
-            event == "ZONE_CHANGED"
-     then
-        self.stepOnUpdate = 0
-        self:SetScript(
-            "OnUpdate",
-            function()
-                self.stepOnUpdate = self.stepOnUpdate + 1
-
-                if self.stepOnUpdate == 1 then
-                    updateHealthValues(self, event)
-                    return
-                end
-                if self.stepOnUpdate == 2 then
-                    unitFrameData(self, event)
-                    return
-                end
-                if self.stepOnUpdate == 3 then
-                    updatePowerValues(self, event)
-                    return
-                end
-                if self.stepOnUpdate == 4 then
-                    updateCastValues(self, event)
-                    return
-                end
-                if self.stepOnUpdate == 5 then
-                    updateRaidMarkers(self, event)
-                    return
-                end
-
-                if self.stepOnUpdate == 6 then
-                    self:SetScript("OnUpdate", nil)
-                    return
-                end
-            end
-        )
-        return
-    end
-
-    if (event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH" or event == "UNIT_HEALTH_FREQUENT" or event == "UNIT_ABSORB_AMOUNT_CHANGED") then
-        updateHealthValues(self, event)
-        return
-    end
-
-    if (event == "UNIT_MAXPOWER" or event == "UNIT_POWER_FREQUENT") then
-        updatePowerValues(self, event)
-        return
-    end
-
-    if (event == "UNIT_SPELLCAST_START" or event == "UNIT_SPELLCAST_CHANNEL_START") then
-        updateCastValues(self, event)
-        return
-    end
-
-    if
-        (event == "UNIT_SPELLCAST_CHANNEL_STOP" or event == "UNIT_SPELLCAST_STOP" or
-            event == "UNIT_SPELLCAST_INTERRUPTED" or
-            event == "UNIT_SPELLCAST_FAILED")
-     then
-        hideCastBar(self, event)
-        return
-    end
-
-    if event == "RAID_TARGET_UPDATE" then
-        updateRaidMarkers(self, event)
-    end
-end
-GW.AddForProfiling("unitframes", "focustarget_OnEvent", focustarget_OnEvent)
+GW.ToggleTargetFrameCombatFeedback = ToggleTargetFrameCombatFeedback
 
 local function LoadTarget()
-    local NewUnitFrame = createNormalUnitFrame("GwTargetUnitFrame")
+    local NewUnitFrame = createNormalUnitFrame("GwTargetUnitFrame", GW.settings.target_FRAME_INVERT)
     NewUnitFrame.unit = "target"
+    NewUnitFrame.type = "NormalTarget"
 
-    RegisterMovableFrame("targetframe", NewUnitFrame, "target_pos", "GwTargetFrameTemplateDummy")
+    RegisterMovableFrame(NewUnitFrame, TARGET, "target_pos",  ALL .. ",Unitframe", nil, {"default", "scaleable"})
 
     NewUnitFrame:ClearAllPoints()
-    NewUnitFrame:SetPoint(
-        GetSetting("target_pos")["point"],
-        UIParent,
-        GetSetting("target_pos")["relativePoint"],
-        GetSetting("target_pos")["xOfs"],
-        GetSetting("target_pos")["yOfs"]
-    )
+    NewUnitFrame:SetPoint("TOPLEFT", NewUnitFrame.gwMover)
 
-    NewUnitFrame:SetAttribute("unit", "target")
+    NewUnitFrame.portrait.mask = NewUnitFrame:CreateMaskTexture()
+    NewUnitFrame.portrait.mask:SetPoint("CENTER", NewUnitFrame.portrait, "CENTER", 0, 0)
+    NewUnitFrame.portrait.mask:SetTexture(186178, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+    NewUnitFrame.portrait.mask:SetSize(58, 58)
+    NewUnitFrame.portrait:AddMaskTexture(NewUnitFrame.portrait.mask)
+
+    NewUnitFrame.altBg = CreateFrame("Frame", nil, NewUnitFrame, "GwAlternativeUnitFrameBackground")
+    NewUnitFrame.altBg:SetAllPoints(NewUnitFrame)
+    if NewUnitFrame.frameInvert then
+        NewUnitFrame.altBg.backgroundOverlay:SetTexCoord(1, 0, 0, 1)
+        NewUnitFrame.altBg.backgroundOverlay:SetPoint("CENTER", -15, -5)
+        NewUnitFrame.healthContainer:ClearAllPoints()
+        NewUnitFrame.healthContainer:SetPoint("RIGHT", NewUnitFrame.healthbarBackground, "RIGHT", -1, 0)
+    end
+
+    NewUnitFrame.segments = {}
+    NewUnitFrame.StagePoints = {}
 
     NewUnitFrame:SetAttribute("*type1", "target")
     NewUnitFrame:SetAttribute("*type2", "togglemenu")
@@ -1292,39 +1027,18 @@ local function LoadTarget()
     NewUnitFrame:EnableMouse(true)
     NewUnitFrame:RegisterForClicks("AnyDown")
 
-    local mask = UIParent:CreateMaskTexture()
-    mask:SetPoint("CENTER", NewUnitFrame.portrait, "CENTER", 0, 0)
-
-    mask:SetTexture("Textures\\MinimapMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
-    mask:SetSize(58, 58)
-    NewUnitFrame.portrait:AddMaskTexture(mask)
-
     AddToClique(NewUnitFrame)
 
-    NewUnitFrame.classColor = GetSetting("target_CLASS_COLOR")
-
-    NewUnitFrame.showHealthValue = GetSetting("target_HEALTH_VALUE_ENABLED")
-    NewUnitFrame.showHealthPrecentage = GetSetting("target_HEALTH_VALUE_TYPE")
-
-    NewUnitFrame.displayBuffs = GetSetting("target_BUFFS")
-    NewUnitFrame.displayDebuffs = GetSetting("target_DEBUFFS")
-
-    NewUnitFrame.debuffFilter = "player"
-
-    if GetSetting("target_BUFFS_FILTER_ALL") == true then
-        NewUnitFrame.debuffFilter = nil
-    end
+    ToggleTargetFrameSettings()
 
     NewUnitFrame:SetScript("OnEvent", target_OnEvent)
 
     NewUnitFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
-    -- NewUnitFrame:RegisterEvent("PLAYER_FOCUS_CHANGED");
     NewUnitFrame:RegisterEvent("ZONE_CHANGED")
     NewUnitFrame:RegisterEvent("RAID_TARGET_UPDATE")
     NewUnitFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 
     NewUnitFrame:RegisterUnitEvent("UNIT_HEALTH", "target")
-    NewUnitFrame:RegisterUnitEvent("UNIT_HEALTH_FREQUENT", "target")
     NewUnitFrame:RegisterUnitEvent("UNIT_MAXHEALTH", "target")
     NewUnitFrame:RegisterUnitEvent("UNIT_ABSORB_AMOUNT_CHANGED", "target")
     NewUnitFrame:RegisterUnitEvent("UNIT_TARGET", "target")
@@ -1335,37 +1049,90 @@ local function LoadTarget()
     NewUnitFrame:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_START", "target")
     NewUnitFrame:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_STOP", "target")
     NewUnitFrame:RegisterUnitEvent("UNIT_SPELLCAST_STOP", "target")
+
+    NewUnitFrame:RegisterUnitEvent("UNIT_SPELLCAST_EMPOWER_START", "target")
+    NewUnitFrame:RegisterUnitEvent("UNIT_SPELLCAST_EMPOWER_UPDATE", "target")
+    NewUnitFrame:RegisterUnitEvent("UNIT_SPELLCAST_EMPOWER_STOP", "target")
+
     NewUnitFrame:RegisterUnitEvent("UNIT_SPELLCAST_INTERRUPTED", "target")
     NewUnitFrame:RegisterUnitEvent("UNIT_SPELLCAST_FAILED", "target")
+    NewUnitFrame:RegisterUnitEvent("UNIT_THREAT_LIST_UPDATE", "target")
+    NewUnitFrame:RegisterUnitEvent("UNIT_FACTION", "target")
+    NewUnitFrame:RegisterUnitEvent("UNIT_HEAL_PREDICTION", "target")
 
-    LoadAuras(NewUnitFrame, NewUnitFrame.auras)
+    LoadAuras(NewUnitFrame)
 
-    TargetFrame:SetScript("OnEvent", nil)
-    TargetFrame:Hide()
+    -- create floating combat text
+    ToggleTargetFrameCombatFeedback()
 end
 GW.LoadTarget = LoadTarget
 
-local function LoadFocus()
-    local NewUnitFrame = createNormalUnitFrame("GwFocusUnitFrame")
-    NewUnitFrame.unit = "focus"
+local function ToggleFocusFrameSettings()
+    GwFocusUnitFrame.classColor = GW.settings.focus_CLASS_COLOR
 
-    RegisterMovableFrame("focusframe", NewUnitFrame, "focus_pos", "GwTargetFrameTemplateDummy")
+    GwFocusUnitFrame.showHealthValue = GW.settings.focus_HEALTH_VALUE_ENABLED
+    GwFocusUnitFrame.showHealthPrecentage = GW.settings.focus_HEALTH_VALUE_TYPE
+    GwFocusUnitFrame.showCastbar = GW.settings.focus_SHOW_CASTBAR
+
+    GwFocusUnitFrame.displayBuffs = GW.settings.focus_BUFFS
+    GwFocusUnitFrame.displayDebuffs = GW.settings.focus_DEBUFFS
+
+    GwFocusUnitFrame.auraPositionTop = GW.settings.focus_AURAS_ON_TOP
+
+    GwFocusUnitFrame.altBg:SetShown(GW.settings.focus_FRAME_ALT_BACKGROUND)
+
+    GwFocusUnitFrame.auras:ClearAllPoints()
+    GwFocusUnitFrame.auras:SetPoint("TOPLEFT", GwFocusUnitFrame.castingbarBackground, "BOTTOMLEFT", 2, -15)
+
+    if GwFocusUnitFrame.auraPositionTop then
+        local yOff = GW.settings.focus_FRAME_ALT_BACKGROUND and 22 or 17
+
+        GwFocusUnitFrame.auras:ClearAllPoints()
+        if GwFocusUnitFrame.frameInvert then
+            GwFocusUnitFrame.auras:SetPoint("TOPRIGHT", GwFocusUnitFrame.nameString, "TOPRIGHT", -2, yOff)
+        else
+            GwFocusUnitFrame.auras:SetPoint("TOPLEFT", GwFocusUnitFrame.nameString, "TOPLEFT", 2, yOff)
+        end
+    end
+
+    -- priority: All > Important > Player
+    GwFocusUnitFrame.debuffFilter = "PLAYER"
+    if GW.settings.focus_BUFFS_FILTER_IMPORTANT then
+        GwFocusUnitFrame.debuffFilter = "IMPORTANT"
+    end
+    if GW.settings.focus_BUFFS_FILTER_ALL then
+        GwFocusUnitFrame.debuffFilter = nil
+    end
+
+    focus_OnEvent(GwFocusUnitFrame, "FORCE_UPDATE")
+end
+GW.ToggleFocusFrameSettings = ToggleFocusFrameSettings
+
+local function LoadFocus()
+    local NewUnitFrame = createNormalUnitFrame("GwFocusUnitFrame", GW.settings.focus_FRAME_INVERT)
+    NewUnitFrame.unit = "focus"
+    NewUnitFrame.type = "NormalTarget"
+
+    RegisterMovableFrame(NewUnitFrame, FOCUS, "focus_pos", ALL .. ",Unitframe", nil, {"default", "scaleable"})
 
     NewUnitFrame:ClearAllPoints()
-    NewUnitFrame:SetPoint(
-        GetSetting("focus_pos")["point"],
-        UIParent,
-        GetSetting("focus_pos")["relativePoint"],
-        GetSetting("focus_pos")["xOfs"],
-        GetSetting("focus_pos")["yOfs"]
-    )
+    NewUnitFrame:SetPoint("TOPLEFT", NewUnitFrame.gwMover)
 
-    local mask = UIParent:CreateMaskTexture()
-    mask:SetPoint("CENTER", NewUnitFrame.portrait, "CENTER", 0, 0)
+    NewUnitFrame.portrait.mask = NewUnitFrame:CreateMaskTexture()
+    NewUnitFrame.portrait.mask:SetPoint("CENTER", NewUnitFrame.portrait, "CENTER", 0, 0)
+    NewUnitFrame.portrait.mask:SetTexture(186178, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+    NewUnitFrame.portrait.mask:SetSize(58, 58)
+    NewUnitFrame.portrait:AddMaskTexture(NewUnitFrame.portrait.mask)
 
-    mask:SetTexture("Textures\\MinimapMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
-    mask:SetSize(58, 58)
-    NewUnitFrame.portrait:AddMaskTexture(mask)
+    NewUnitFrame.altBg = CreateFrame("Frame", nil, NewUnitFrame, "GwAlternativeUnitFrameBackground")
+    NewUnitFrame.altBg:SetAllPoints(NewUnitFrame)
+    if NewUnitFrame.frameInvert then
+        NewUnitFrame.altBg.backgroundOverlay:SetTexCoord(1, 0, 0, 1)
+        NewUnitFrame.altBg.backgroundOverlay:SetPoint("CENTER", -15, -5)
+    end
+
+    NewUnitFrame.segments = {}
+    NewUnitFrame.StagePoints = {}
 
     NewUnitFrame:SetAttribute("*type1", "target")
     NewUnitFrame:SetAttribute("*type2", "togglemenu")
@@ -1376,18 +1143,7 @@ local function LoadFocus()
 
     AddToClique(NewUnitFrame)
 
-    NewUnitFrame.showHealthValue = GetSetting("focus_HEALTH_VALUE_ENABLED")
-    NewUnitFrame.showHealthPrecentage = GetSetting("focus_HEALTH_VALUE_TYPE")
-
-    NewUnitFrame.classColor = GetSetting("focus_CLASS_COLOR")
-
-    NewUnitFrame.displayBuffs = GetSetting("focus_BUFFS")
-    NewUnitFrame.displayDebuffs = GetSetting("focus_DEBUFFS")
-
-    NewUnitFrame.debuffFilter = "player"
-    if GetSetting("focus_BUFFS_FILTER_ALL") == true then
-        NewUnitFrame.debuffFilter = nil
-    end
+    ToggleFocusFrameSettings()
 
     NewUnitFrame:SetScript("OnEvent", focus_OnEvent)
 
@@ -1396,7 +1152,6 @@ local function LoadFocus()
     NewUnitFrame:RegisterEvent("RAID_TARGET_UPDATE")
 
     NewUnitFrame:RegisterUnitEvent("UNIT_HEALTH", "focus")
-    NewUnitFrame:RegisterUnitEvent("UNIT_HEALTH_FREQUENT", "focus")
     NewUnitFrame:RegisterUnitEvent("UNIT_MAXHEALTH", "focus")
     NewUnitFrame:RegisterUnitEvent("UNIT_ABSORB_AMOUNT_CHANGED", "focus")
     NewUnitFrame:RegisterUnitEvent("UNIT_TARGET", "focus")
@@ -1409,124 +1164,67 @@ local function LoadFocus()
     NewUnitFrame:RegisterUnitEvent("UNIT_SPELLCAST_STOP", "focus")
     NewUnitFrame:RegisterUnitEvent("UNIT_SPELLCAST_INTERRUPTED", "focus")
     NewUnitFrame:RegisterUnitEvent("UNIT_SPELLCAST_FAILED", "focus")
+    NewUnitFrame:RegisterUnitEvent("UNIT_HEAL_PREDICTION", "focus")
+    NewUnitFrame:RegisterUnitEvent("UNIT_FACTION", "focus")
+    NewUnitFrame:RegisterUnitEvent("UNIT_SPELLCAST_EMPOWER_START", "focus")
+    NewUnitFrame:RegisterUnitEvent("UNIT_SPELLCAST_EMPOWER_UPDATE", "focus")
+    NewUnitFrame:RegisterUnitEvent("UNIT_SPELLCAST_EMPOWER_STOP", "focus")
 
-    LoadAuras(NewUnitFrame, NewUnitFrame.auras)
-
-    FocusFrame:SetScript("OnEvent", nil)
-    FocusFrame:Hide()
+    LoadAuras(NewUnitFrame)
 end
 GW.LoadFocus = LoadFocus
 
-local function LoadTargetOfTarget()
-    local NewUnitFrame = createNormalUnitFrameSmall()
-    NewUnitFrame.unit = "targettarget"
+local function ToggleTargetTargetFrameSetting(unit)
+    _G["Gw" .. unit .. "TargetUnitFrame"].classColor = GW.settings[string.lower(unit) .. "_CLASS_COLOR"]
+    _G["Gw" .. unit .. "TargetUnitFrame"].showCastbar = GW.settings[string.lower(unit) .. "_TARGET_SHOW_CASTBAR"]
 
-    RegisterMovableFrame("targettargetframe", NewUnitFrame, "targettarget_pos", "GwTargetFrameTemplateDummy")
 
-    NewUnitFrame:ClearAllPoints()
-    NewUnitFrame:SetPoint(
-        GetSetting("targettarget_pos")["point"],
-        UIParent,
-        GetSetting("targettarget_pos")["relativePoint"],
-        GetSetting("targettarget_pos")["xOfs"],
-        GetSetting("targettarget_pos")["yOfs"]
-    )
+    _G["Gw" .. unit .. "TargetUnitFrame"].altBg:SetShown((unit == "Target" and GW.settings.target_FRAME_ALT_BACKGROUND) or (unit == "Focus" and GW.settings.focus_FRAME_ALT_BACKGROUND))
 
-    NewUnitFrame:SetAttribute("unit", "targettarget")
-
-    NewUnitFrame:SetAttribute("*type1", "target")
-    NewUnitFrame:SetAttribute("*type2", "togglemenu")
-    NewUnitFrame:SetAttribute("unit", "targettarget")
-    RegisterUnitWatch(NewUnitFrame)
-    NewUnitFrame:EnableMouse(true)
-    NewUnitFrame:RegisterForClicks("AnyDown")
-
-    AddToClique(NewUnitFrame)
-
-    NewUnitFrame.showHealthValue = false
-    NewUnitFrame.showHealthPrecentage = false
-
-    NewUnitFrame.classColor = GetSetting("target_CLASS_COLOR")
-    NewUnitFrame.debuffFilter = nil
-
-    NewUnitFrame:SetScript("OnEvent", targettarget_OnEvent)
-
-    NewUnitFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
-    NewUnitFrame:RegisterEvent("PLAYER_FOCUS_CHANGED")
-    NewUnitFrame:RegisterEvent("ZONE_CHANGED")
-    NewUnitFrame:RegisterEvent("RAID_TARGET_UPDATE")
-
-    NewUnitFrame:RegisterUnitEvent("UNIT_TARGET", "targettarget")
-    NewUnitFrame:RegisterUnitEvent("UNIT_HEALTH", "targettarget")
-    NewUnitFrame:RegisterUnitEvent("UNIT_HEALTH_FREQUENT", "targettarget")
-    NewUnitFrame:RegisterUnitEvent("UNIT_MAXHEALTH", "targettarget")
-    NewUnitFrame:RegisterUnitEvent("UNIT_ABSORB_AMOUNT_CHANGED", "targettarget")
-    NewUnitFrame:RegisterUnitEvent("UNIT_TARGET", "targettarget")
-    NewUnitFrame:RegisterUnitEvent("UNIT_POWER_FREQUENT", "targettarget")
-    NewUnitFrame:RegisterUnitEvent("UNIT_MAXPOWER", "targettarget")
-    NewUnitFrame:RegisterUnitEvent("UNIT_AURA", "targettarget")
-    NewUnitFrame:RegisterUnitEvent("UNIT_SPELLCAST_START", "targettarget")
-    NewUnitFrame:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_START", "targettarget")
-    NewUnitFrame:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_STOP", "targettarget")
-    NewUnitFrame:RegisterUnitEvent("UNIT_SPELLCAST_STOP", "targettarget")
-    NewUnitFrame:RegisterUnitEvent("UNIT_SPELLCAST_INTERRUPTED", "targettarget")
-    NewUnitFrame:RegisterUnitEvent("UNIT_SPELLCAST_FAILED", "targettarget")
+    if unit == "Target" then
+        target_OnEvent(GwTargetUnitFrame, "FORCE_UPDATE")
+    else
+        focus_OnEvent(GwFocusTargetUnitFrame, "FORCE_UPDATE")
+    end
 end
-GW.LoadTargetOfTarget = LoadTargetOfTarget
+GW.ToggleTargetTargetFrameSetting = ToggleTargetTargetFrameSetting
 
-local function LoadTargetOfFocus()
-    local NewUnitFrame = createNormalUnitFrameSmall()
-    NewUnitFrame.unit = "focustarget"
+local function LoadTargetOfUnit(unit)
+    local f = createNormalUnitFrameSmall("Gw" .. unit .. "TargetUnitFrame")
+    local unitID = string.lower(unit) .. "target"
+    f.type = "SmallTarget"
+    f.unit = unitID
 
-    RegisterMovableFrame("focustargetframe", NewUnitFrame, "focustarget_pos", "GwTargetFrameTemplateDummy")
+    f.segments = {}
+    f.StagePoints = {}
 
-    NewUnitFrame:ClearAllPoints()
-    NewUnitFrame:SetPoint(
-        GetSetting("focustarget_pos")["point"],
-        UIParent,
-        GetSetting("focustarget_pos")["relativePoint"],
-        GetSetting("focustarget_pos")["xOfs"],
-        GetSetting("focustarget_pos")["yOfs"]
-    )
+    RegisterMovableFrame(f, unit == "Focus" and MINIMAP_TRACKING_FOCUS or SHOW_TARGET_OF_TARGET_TEXT, unitID .. "_pos", ALL .. ",Unitframe", nil, {"default", "scaleable"})
 
-    NewUnitFrame:SetAttribute("unit", "focustarget")
+    f:ClearAllPoints()
+    f:SetPoint("TOPLEFT", f.gwMover)
 
-    NewUnitFrame:SetAttribute("*type1", "target")
-    NewUnitFrame:SetAttribute("*type2", "togglemenu")
-    NewUnitFrame:SetAttribute("unit", "focustarget")
-    RegisterUnitWatch(NewUnitFrame)
-    NewUnitFrame:EnableMouse(true)
-    NewUnitFrame:RegisterForClicks("AnyDown")
+    f:SetAttribute("*type1", "target")
+    f:SetAttribute("*type2", "togglemenu")
+    f:SetAttribute("unit", unitID)
+    RegisterUnitWatch(f)
+    f:EnableMouse(true)
+    f:RegisterForClicks("AnyDown")
 
-    AddToClique(NewUnitFrame)
+    f.altBg = CreateFrame("Frame", nil, f, "GwAlternativeUnitFrameBackground")
+    f.altBg.backgroundOverlay:Hide()
+    f.altBg.backgroundOverlaySmall:Show()
+    f.altBg:SetAllPoints(f)
 
-    NewUnitFrame.showHealthValue = false
-    NewUnitFrame.showHealthPrecentage = false
+    AddToClique(f)
 
-    NewUnitFrame.classColor = GetSetting("target_CLASS_COLOR")
-    NewUnitFrame.debuffFilter = nil
+    f.showHealthValue = false
+    f.showHealthPrecentage = false
 
-    NewUnitFrame:SetScript("OnEvent", focustarget_OnEvent)
+    ToggleTargetTargetFrameSetting(unit)
 
-    NewUnitFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
-    NewUnitFrame:RegisterEvent("PLAYER_FOCUS_CHANGED")
-    NewUnitFrame:RegisterEvent("ZONE_CHANGED")
-    NewUnitFrame:RegisterEvent("RAID_TARGET_UPDATE")
+    f.debuffFilter = nil
 
-    NewUnitFrame:RegisterUnitEvent("UNIT_TARGET", "focustarget")
-    NewUnitFrame:RegisterUnitEvent("UNIT_HEALTH", "focustarget")
-    NewUnitFrame:RegisterUnitEvent("UNIT_HEALTH_FREQUENT", "focustarget")
-    NewUnitFrame:RegisterUnitEvent("UNIT_MAXHEALTH", "focustarget")
-    NewUnitFrame:RegisterUnitEvent("UNIT_ABSORB_AMOUNT_CHANGED", "focustarget")
-    NewUnitFrame:RegisterUnitEvent("UNIT_TARGET", "focustarget")
-    NewUnitFrame:RegisterUnitEvent("UNIT_POWER_FREQUENT", "focustarget")
-    NewUnitFrame:RegisterUnitEvent("UNIT_MAXPOWER", "focustarget")
-    NewUnitFrame:RegisterUnitEvent("UNIT_AURA", "focustarget")
-    NewUnitFrame:RegisterUnitEvent("UNIT_SPELLCAST_START", "focustarget")
-    NewUnitFrame:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_START", "focustarget")
-    NewUnitFrame:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_STOP", "focustarget")
-    NewUnitFrame:RegisterUnitEvent("UNIT_SPELLCAST_STOP", "focustarget")
-    NewUnitFrame:RegisterUnitEvent("UNIT_SPELLCAST_INTERRUPTED", "focustarget")
-    NewUnitFrame:RegisterUnitEvent("UNIT_SPELLCAST_FAILED", "focustarget")
+    f.totalElapsed = 0.15
+    f:SetScript("OnUpdate", unittarget_OnUpdate)
 end
-GW.LoadTargetOfFocus = LoadTargetOfFocus
+GW.LoadTargetOfUnit = LoadTargetOfUnit

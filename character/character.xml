@@ -26,18 +26,11 @@
         </Layers>
     </Button>
 
-    <Frame name="GwCharacterWindowMoverFrame" enableMouse="true" movable="true" virtual="true" hidden="true">
-        <Size x="853" y="50"></Size>
-        <Anchors>
-            <Anchor point="LEFT" relativePoint="LEFT" x="150" y="400"></Anchor>
-        </Anchors>
-    </Frame>
-
-    <Frame name="GwCharacterWindow" inherits="SecureHandlerStateTemplate,SecureHandlerAttributeTemplate,SecureHandlerShowHideTemplate,SecureHandlerClickTemplate" enableMouse="true" virtual="true" protected="true" hidden="true" frameStrata="HIGH">
+    <Frame name="GwCharacterWindowTemplate" inherits="SecureHandlerStateTemplate,SecureHandlerAttributeTemplate,SecureHandlerShowHideTemplate" enableMouse="true" virtual="true" protected="true" hidden="true" frameStrata="HIGH" movable="true" resizable="true" toplevel="true">
+        <HitRectInsets>
+            <AbsInset left="-40" right="0" top="-40" bottom="-40"/>
+        </HitRectInsets>
         <Size x="853" y="627"></Size>
-        <Anchors>
-            <Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" relativeTo="GwCharacterWindowMoverFrame" x="0"></Anchor>
-        </Anchors>
         <Layers>
             <Layer level="ARTWORK">
                 <Texture parentKey="background" file="Interface\AddOns\GW2_UI\textures\character\windowbg">
@@ -49,10 +42,10 @@
                 <Texture name="$parentHeader" file="Interface\AddOns\GW2_UI\textures\bag\bagheader">
                     <Size x="512" y="64"></Size>
                     <Anchors>
-                        <Anchor point="BOTTOMLEFT" relativePoint="TOPLEFT" x="0" y="0" />
+                        <Anchor point="BOTTOMLEFT" relativePoint="TOPLEFT" x="-40" y="0" />
                     </Anchors>
                 </Texture>
-                <Texture name="$parentHeader" file="Interface\AddOns\GW2_UI\textures\bag\bagheader-right">
+                <Texture name="$parentHeaderRight" file="Interface\AddOns\GW2_UI\textures\bag\bagheader-right">
                     <Size x="512" y="64"></Size>
                     <Anchors>
                         <Anchor point="BOTTOMRIGHT" relativePoint="TOPRIGHT" x="0" y="0" />
@@ -61,7 +54,7 @@
                 <Texture name="$parentLeft" file="Interface\AddOns\GW2_UI\textures\bag\bagleftpanel">
                     <Size x="40" y="512"></Size>
                     <Anchors>
-                        <Anchor point="TOPRIGHT" relativePoint="TOPLEFT" x="0" y="20" />
+                        <Anchor point="TOPRIGHT" relativePoint="TOPLEFT" x="0" y="0" />
                         <Anchor point="BOTTOMRIGHT" relativePoint="BOTTOMLEFT" x="0" y="0" />
                     </Anchors>
                 </Texture>
@@ -69,7 +62,7 @@
             </Layer>
 
             <Layer level="ARTWORK" textureSubLevel="2">
-                <Texture parentKey="windowIcon" file="Interface\AddOns\GW2_UI\textures\character\character-window-icon" protected="true">
+                <Texture parentKey="windowIcon" file="Interface\AddOns\GW2_UI\textures\character\character-window-icon">
                     <Size x="84" y="84"></Size>
                     <Anchors>
                         <Anchor point="BOTTOMRIGHT" relativePoint="TOPLEFT" x="18" y="-22" />
@@ -92,14 +85,42 @@
         </Layers>
 
         <Frames>
+            <Button parentKey="secure" name="$parentClick" inherits="SecureHandlerClickTemplate" hidden="true">
+            </Button>
+
+            <Frame parentKey="mover" enableMouse="true" inherits="SecureHandlerMouseUpDownTemplate">
+                <Size y="40" />
+                <Anchors>
+                    <Anchor point="BOTTOMLEFT" relativePoint="TOPLEFT" x="-40" y="0"></Anchor>
+                    <Anchor point="BOTTOMRIGHT" relativePoint="TOPRIGHT" x="-30" y="0"></Anchor>
+                </Anchors>
+            </Frame>
+
+            <Frame parentKey="sizer" enableMouse="true">
+                <Size x="32" y="32"></Size>
+                <Anchors>
+                    <Anchor point="BOTTOMRIGHT" relativePoint="BOTTOMRIGHT" x="0" y="0"></Anchor>
+                </Anchors>
+                <Layers>
+                    <Layer level="OVERLAY">
+                        <Texture parentKey="texture" file="Interface/AddOns/GW2_UI/textures/uistuff/resize">
+                            <Size x="32" y="32"></Size>
+                            <Anchors>
+                                <Anchor point="BOTTOMRIGHT" x="0" y="0"></Anchor>
+                            </Anchors>
+                        </Texture>
+                    </Layer>
+                </Layers>
+            </Frame>
+
             <Button name="$parentClose" parentKey="close" inherits="SecureHandlerClickTemplate" text="" framelevel="10">
                 <Size x="20" y="20" />
                 <Anchors>
                     <Anchor point="TOPRIGHT" relativePoint="TOPRIGHT" x="-10" y="30"/>
                 </Anchors>
-                <NormalTexture file="Interface\AddOns\GW2_UI\textures\window-close-button-normal"></NormalTexture>
-                <PushedTexture file="Interface\AddOns\GW2_UI\textures\window-close-button-hover"></PushedTexture >
-                <HighlightTexture file="Interface\AddOns\GW2_UI\textures\window-close-button-hover"></HighlightTexture >
+                <NormalTexture file="Interface/AddOns/GW2_UI/textures/uistuff/window-close-button-normal"></NormalTexture>
+                <PushedTexture file="Interface/AddOns/GW2_UI/textures/uistuff/window-close-button-hover"></PushedTexture >
+                <HighlightTexture file="Interface/AddOns/GW2_UI/textures/uistuff/window-close-button-hover"></HighlightTexture >
 
                 <NormalFont style="ChatBubbleFont"></NormalFont>
                 <HighlightFont style="ChatBubbleFont"></HighlightFont>
@@ -109,6 +130,7 @@
         </Frames>
     </Frame>
 
+
     <Frame name="GwCharacterMenu" virtual="true">
         <Size x="231" y="498"></Size>
         <Anchors>
@@ -116,15 +138,23 @@
         </Anchors>
     </Frame>
 
-    <Button name="GwCharacterMenuButtonTemplate" inherits="GwStandardButton" jusifyH="LEFT" virtual="true">
+    <Button name="GwCharacterMenuButtonTemplate" inherits="GwStandardButton" virtual="true">
         <Size x="231" y="36"></Size>
         <Anchors>
             <Anchor point="TOPLEFT" relativePoint="TOPLEFT"></Anchor>
         </Anchors>
         <NormalTexture file="Interface\AddOns\GW2_UI\textures\character\menu-bg"></NormalTexture>
         <Layers>
+            <Layer textureSubLevel="OVERLAY">
+                <Texture parentKey="activeTexture" file="Interface\AddOns\GW2_UI\textures\character\menu-hover" hidden="true">
+                    <Anchors>
+                        <Anchor point="TOPLEFT" relativePoint="TOPLEFT"></Anchor>
+                        <Anchor point="BOTTOMRIGHT" relativePoint="BOTTOMRIGHT"></Anchor>
+                    </Anchors>
+                </Texture>
+            </Layer>
             <Layer>
-                <Texture file="Interface\AddOns\GW2_UI\textures\character\menu-arrow">
+                <Texture parentKey="arrow" file="Interface\AddOns\GW2_UI\textures\character\menu-arrow">
                     <Size x="10" y="20"></Size>
                     <Anchors>
                         <Anchor point="RIGHT" relativePoint="RIGHT"></Anchor>
@@ -134,10 +164,10 @@
         </Layers>
     </Button>
 
-    <Button name="GwCharacterMenuButtonBack" inherits="GwStandardButton" jusifyH="LEFT" virtual="true">
+    <Button name="GwCharacterMenuButtonBack" inherits="GwStandardButton" virtual="true">
         <Layers>
-            <Layer layer="OVERLAY" textureSubLevel="8">
-                <Texture file="Interface\AddOns\GW2_UI\textures\character\backicon">
+            <Layer level="OVERLAY" textureSubLevel="8">
+                <Texture parentKey="backarrow" file="Interface\AddOns\GW2_UI\textures\character\backicon">
                     <Size x="32" y="32"></Size>
                     <Anchors>
                         <Anchor point="LEFT" relativePoint="LEFT"></Anchor>
@@ -147,7 +177,5 @@
         </Layers>
     </Button>
 
-    <Button name="GwCharacterMenuBlank" inherits="GwStandardButton" text="Not yet loaded" jusifyH="LEFT" virtual="true">
-    </Button>
-
+    <Button name="GwCharacterMenuBlank" inherits="GwStandardButton" text="Not yet loaded" virtual="true"/>
 </Ui>

@@ -3,6 +3,8 @@ local CharacterMenuBlank_OnLoad = GW.CharacterMenuBlank_OnLoad
 local SavedItemSlots = GW.char_equipset_SavedItems
 local WarningPrompt = GW.WarningPrompt
 
+
+local GwGearManagerPopupFrame
 -- local forward function defs
 local drawItemSetList
 
@@ -21,7 +23,7 @@ end
 GW.AddForProfiling("character_equipset", "updateIngoredSlots", updateIngoredSlots)
 
 local function toggleIgnoredSlots(show)
-    for k, v in pairs(SavedItemSlots) do
+    for _, v in pairs(SavedItemSlots) do
         if show then
             v.ignoreSlotCheck:Show()
         else
@@ -31,7 +33,7 @@ local function toggleIgnoredSlots(show)
 end
 GW.AddForProfiling("character_equipset", "toggleIgnoredSlots", toggleIgnoredSlots)
 
-local function outfitListButton_OnClick(self, button)
+local function outfitListButton_OnClick(self)
     if not self.saveOutfit:IsShown() then
         drawItemSetList()
         toggleIgnoredSlots(true)
@@ -58,7 +60,7 @@ local function outfitListButton_OnClick(self, button)
 end
 GW.AddForProfiling("character_equipset", "outfitListButton_OnClick", outfitListButton_OnClick)
 
-local function outfitEquipButton_OnClick(self, button)
+local function outfitEquipButton_OnClick()
     local selectedSetID = GwPaperDollOutfits.selectedSetID
     if (selectedSetID ~= nil) then
         PlaySound(SOUNDKIT.IG_CHARACTER_INFO_TAB)
@@ -68,33 +70,64 @@ local function outfitEquipButton_OnClick(self, button)
 end
 GW.AddForProfiling("character_equipset", "outfitEquipButton_OnClick", outfitEquipButton_OnClick)
 
-local function outfitSaveButton_OnClick(self, button)
+
+local function GearSetButton_Edit(self)
+    GwGearManagerPopupFrame.mode = IconSelectorPopupFrameModes.Edit
+    PaperDollFrame.EquipmentManagerPane.selectedSetID = self.setID
+    GwGearManagerPopupFrame.setID = self.setID
+    GwGearManagerPopupFrame.origName = self.setName
+    GwGearManagerPopupFrame:Show()
+    GwGearManagerPopupFrame:OnShow()
+end
+
+local function outfitSaveButton_OnClick(self)
     WarningPrompt(
-        GwLocalization["CHARACTER_OUTFITS_SAVE"] .. " (" .. self:GetParent().setName .. ")",
+        TRANSMOG_OUTFIT_CONFIRM_SAVE:format(self:GetParent().setName),
         function()
             C_EquipmentSet.SaveEquipmentSet(self:GetParent().setID)
             drawItemSetList()
+            toggleIgnoredSlots(false)
         end
     )
 end
 GW.AddForProfiling("character_equipset", "outfitSaveButton_OnClick", outfitSaveButton_OnClick)
 
-local function outfitEditButton_OnClick(self, button)
-    GearManagerDialogPopup:SetParent(GwDressingRoom)
-    GearManagerDialogPopup:SetPoint("TOPLEFT", GwDressingRoom, "TOPRIGHT")
-    GearManagerDialogPopup:Show()
-    
-    local parent = self:GetParent()
-    GearManagerDialogPopup.isEdit = true
-    GearManagerDialogPopup.setID = parent.setID
-    GearManagerDialogPopup.origName = parent.setName
-	RecalculateGearManagerDialogPopup(parent.setName, parent.icon:GetTexture())
+local function outfitEditButton_OnClick(self)
+    MenuUtil.CreateContextMenu(self, function(ownerRegion, rootDescription)
+        rootDescription:CreateButton(EQUIPMENT_SET_EDIT, function()
+            GearSetButton_Edit(self:GetParent())
+        end)
+        rootDescription:CreateTitle(EQUIPMENT_SET_ASSIGN_TO_SPEC)
+
+        do
+            for i = 1, GetNumSpecializations() do
+                local function IsSelected(id)
+                    return C_EquipmentSet.GetEquipmentSetAssignedSpec(self:GetParent().setID) == id
+                end
+
+                local function SetSelected(id)
+                    local currentSpecIndex = C_EquipmentSet.GetEquipmentSetAssignedSpec(self:GetParent().setID)
+                    if currentSpecIndex ~= id then
+                        C_EquipmentSet.AssignSpecToEquipmentSet(self:GetParent().setID, id)
+                    else
+                        C_EquipmentSet.UnassignEquipmentSetSpec(self:GetParent().setID)
+                    end
+
+                    GearSetButton_UpdateSpecInfo(self:GetParent())
+                    PaperDollEquipmentManagerPane_Update(true)
+                end
+
+                local name = select(2, GetSpecializationInfoByID(GetSpecializationInfo(i)))
+                rootDescription:CreateCheckbox(name, IsSelected, SetSelected, i)
+            end
+        end
+    end)
 end
 GW.AddForProfiling("character_equipset", "outfitEditButton_OnClick", outfitEditButton_OnClick)
 
-local function outfitDeleteButton_OnClick(self, button)
+local function outfitDeleteButton_OnClick(self)
     WarningPrompt(
-        GwLocalization["CHARACTER_OUTFITS_DELETE"] .. " (" .. self:GetParent().setName .. ")",
+        TRANSMOG_OUTFIT_CONFIRM_DELETE:format(self:GetParent().setName),
         function()
             C_EquipmentSet.DeleteEquipmentSet(self:GetParent().setID)
 
@@ -105,7 +138,7 @@ end
 GW.AddForProfiling("character_equipset", "outfitDeleteButton_OnClick", outfitDeleteButton_OnClick)
 
 local function getNewEquipmentSetButton(i)
-    if _G["GwPaperDollOutfitsButton" .. i] ~= nil then
+    if _G["GwPaperDollOutfitsButton" .. i] then
         return _G["GwPaperDollOutfitsButton" .. i]
     end
 
@@ -144,8 +177,6 @@ local function getNewEquipmentSetButton(i)
     end
     GwPaperDollOutfits.buttons = GwPaperDollOutfits.buttons + 1
 
-    f.standardOnClick = f:GetScript("OnEnter")
-
     f:GetFontString():ClearAllPoints()
     f:GetFontString():SetPoint("TOP", f, "TOP", 0, -20)
 
@@ -171,8 +202,7 @@ drawItemSetList = function()
         if numSets >= i then
             local frame = getNewEquipmentSetButton(i)
 
-            local name, texture, setID, isEquipped, _, _, _, numLost, _ =
-                C_EquipmentSet.GetEquipmentSetInfo(id_table[i])
+            local name, texture, setID, isEquipped, _, _, _, numLost, _ = C_EquipmentSet.GetEquipmentSetInfo(id_table[i])
 
             frame:Show()
             frame.saveOutfit:Hide()
@@ -187,13 +217,14 @@ drawItemSetList = function()
                 function(self)
                     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
                     GameTooltip:SetEquipmentSet(self.setID)
-                    self.standardOnClick(self)
                 end
             )
 
             frame:SetText(name)
             frame.setName = name
             frame.setID = setID
+
+            GearSetButton_UpdateSpecInfo(frame)
 
             if texture then
                 frame.icon:SetTexture(texture)
@@ -205,7 +236,7 @@ drawItemSetList = function()
                 frame:SetNormalTexture("Interface\\AddOns\\GW2_UI\\textures\\character\\menu-bg")
                 textureC = 2
             else
-                frame:SetNormalTexture(nil)
+                frame:ClearNormalTexture()
                 textureC = 1
             end
             if isEquipped then
@@ -217,7 +248,7 @@ drawItemSetList = function()
                 frame:GetFontString():SetTextColor(1, 1, 1)
             end
         else
-            if _G["GwPaperDollOutfitsButton" .. i] ~= nil then
+            if _G["GwPaperDollOutfitsButton" .. i] then
                 _G["GwPaperDollOutfitsButton" .. i]:Hide()
             end
         end
@@ -255,19 +286,33 @@ end
 --]]
 local function LoadPDEquipset(fmMenu)
     local fmGPDO = CreateFrame("Frame", "GwPaperDollOutfits", GwPaperDoll, "GwPaperDollOutfits")
-    local fnGPDO_newOutfit_OnClick = function(self, button)
-        self.oldParent = GearManagerDialogPopup:GetParent()
-        GearManagerDialogPopup:Show()
-        GearManagerDialogPopup:SetParent(GwDressingRoom)
-        GearManagerDialogPopup:SetPoint("TOPLEFT", GwDressingRoom, "TOPRIGHT")
-        PaperDollEquipmentManagerPane.selectedSetID = nil
-        PaperDollFrame_ClearIgnoredSlots()
-        PaperDollFrame_IgnoreSlot(4)
-        PaperDollFrame_IgnoreSlot(19)
+    GwGearManagerPopupFrame = CreateFrame("Frame", "GwGearManagerPopupFrame", GwDressingRoom, "IconSelectorPopupFrameTemplate")
+    Mixin(GwGearManagerPopupFrame, GearManagerPopupFrameMixin)
+    GwGearManagerPopupFrame:Hide()
+
+    GwGearManagerPopupFrame:SetParent(GwDressingRoom)
+    GwGearManagerPopupFrame:ClearAllPoints()
+    GwGearManagerPopupFrame:SetPoint("TOPLEFT", GwDressingRoom, "TOPRIGHT")
+    local fnGPDO_newOutfit_OnClick = function()
+        GwGearManagerPopupFrame.mode = IconSelectorPopupFrameModes.New
+        PaperDollFrame.EquipmentManagerPane.selectedSetID = nil
+        GwGearManagerPopupFrame:Show()
+        GwGearManagerPopupFrame:OnShow()
+        PaperDollEquipmentManagerPane_Update(true)
+
+        -- Ignore shirt and tabard by default
+		PaperDollFrame_IgnoreSlot(4)
+		PaperDollFrame_IgnoreSlot(19)
     end
     fmGPDO.newOutfit:SetText(TRANSMOG_OUTFIT_NEW)
     fmGPDO.newOutfit:SetScript("OnClick", fnGPDO_newOutfit_OnClick)
     fmMenu:SetupBackButton(fmGPDO.backButton, CHARACTER .. ":\n" .. EQUIPMENT_MANAGER)
+
+    hooksecurefunc(GwGearManagerPopupFrame, "OnShow", function(frame)
+        if not frame.isSkinned then
+            GW.HandleIconSelectionFrame(frame)
+        end
+    end)
 
     GwPaperDollOutfits:SetScript("OnShow", drawItemSetList)
     GwPaperDollOutfits:SetScript(
@@ -278,16 +323,6 @@ local function LoadPDEquipset(fmMenu)
     )
     drawItemSetList()
 
-    hooksecurefunc("GearManagerDialogPopupOkay_OnClick", drawItemSetList)
-    GearManagerDialogPopup:SetScript(
-        "OnShow",
-        function(self)
-            PlaySound(SOUNDKIT.IG_CHARACTER_INFO_OPEN)
-            self.name = nil
-            self.isEdit = false
-            RecalculateGearManagerDialogPopup()
-            RefreshEquipmentSetIconInfo()
-        end
-    )
+    hooksecurefunc(GwGearManagerPopupFrame, "OkayButton_OnClick", drawItemSetList)
 end
 GW.LoadPDEquipset = LoadPDEquipset
