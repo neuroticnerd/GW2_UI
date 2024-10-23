@@ -142,7 +142,7 @@ local headerGroupBy = {
 		header:SetAttribute("sortMethod", sortMethod or "NAME")
 		header:SetAttribute("groupBy", "ASSIGNEDROLE")
 	end,
-	NAME = function(header)
+	NAME = function(header, profile)
 		header:SetAttribute("groupingOrder", "1,2,3,4,5,6,7,8")
 		header:SetAttribute("sortMethod", "NAME")
 		header:SetAttribute("groupBy", nil)
@@ -153,18 +153,18 @@ local headerGroupBy = {
 		header:SetAttribute("sortMethod", sortMethod or "INDEX")
 		header:SetAttribute("groupBy", "GROUP")
 	end,
-	PETNAME = function(header)
+	PETNAME = function(header, profile)
 		header:SetAttribute("groupingOrder", "1,2,3,4,5,6,7,8")
 		header:SetAttribute("sortMethod", "NAME")
 		header:SetAttribute("groupBy", nil)
 		header:SetAttribute("filterOnPet", true) --This is the line that matters. Without this, it sorts based on the owners name
 	end,
-	INDEX = function(header)
+	INDEX = function(header, profile)
 		header:SetAttribute("groupingOrder", "1,2,3,4,5,6,7,8")
 		header:SetAttribute("sortMethod", "INDEX")
 		header:SetAttribute("groupBy", nil)
 	end,
-    TANK = function(header)
+    TANK = function(header, profile)
         header:SetAttribute("groupingOrder", "TANK,HEALER,DAMAGER,NONE")
 		header:SetAttribute("sortMethod", "INDEX")
 		header:SetAttribute("groupBy", nil)
@@ -265,6 +265,9 @@ local function UpdateSettings(profile, onlyHeaderUpdate, updateHeaderAndFrames)
     settings.sortMethod.RAID25 = GW.settings.RAID_RAID_SORT_METHOD_RAID25
     settings.sortMethod.RAID10 = GW.settings.RAID_RAID_SORT_METHOD_RAID10
     settings.sortMethod.TANK = GW.settings.RAID_RAID_SORT_METHOD_TANK
+
+    -- grid specific settings
+    settings.partyGridShowPlayer = GW.settings.RAID_SHOW_PLAYER_PARTY
 
     -- Update this settings on a spec switch
     if not settingsEventFrame.isSetup then
@@ -409,7 +412,7 @@ local function UpdateGridHeader(profile)
     if header.isUpdating then return end
     header.isUpdating = true
 
-    local x, y = DIRECTION_TO_HORIZONTAL_SPACING_MULTIPLIER[settings.raidGrow[profile]], DIRECTION_TO_VERTICAL_SPACING_MULTIPLIER[settings.raidGrow[profile]]
+    local x, y = DIRECTION_TO_HORIZONTAL_SPACING_MULTIPLIER[(settings.raidGrow[profile] or "DOWN+RIGHT")], DIRECTION_TO_VERTICAL_SPACING_MULTIPLIER[(settings.raidGrow[profile] or "DOWN+RIGHT")]
     local numGroups = header.numGroups
     local isParty = profile == "PARTY"
     local groupsPerRowCol = isParty and 1 or tonumber(settings.groupsPerColumnRow[profile])
@@ -424,6 +427,11 @@ local function UpdateGridHeader(profile)
     local groupBy = settings.groupBy[profile]
     local sortDirection = settings.sortDirection[profile]
     local raidWideSorting = settings.raidWideSorting[profile]
+    local showPlayer = true
+
+    if isParty then
+        showPlayer = settings.partyGridShowPlayer
+    end
 
     for i = 1, numGroups do
         local group = header.groups[i]
@@ -442,7 +450,7 @@ local function UpdateGridHeader(profile)
             end
 
 
-            local point = DIRECTION_TO_POINT[settings.raidGrow[profile]]
+            local point = DIRECTION_TO_POINT[(settings.raidGrow[profile] or "DOWN+RIGHT")]
             group:SetAttribute("point", point)
 
             if point == "LEFT" or point == "RIGHT" then
@@ -464,12 +472,12 @@ local function UpdateGridHeader(profile)
                 group:SetAttribute("startingIndex", 1)
             end
 
-            group:SetAttribute("columnAnchorPoint", DIRECTION_TO_COLUMN_ANCHOR_POINT[settings.raidGrow[profile]])
+            group:SetAttribute("columnAnchorPoint", DIRECTION_TO_COLUMN_ANCHOR_POINT[(settings.raidGrow[profile] or "DOWN+RIGHT")])
 
             if not group.isForced then
                 group:SetAttribute("maxColumns", raidWideSorting and numGroups or 1)
                 group:SetAttribute("unitsPerColumn", raidWideSorting and (groupsPerRowCol * 5) or 5)
-                group:SetAttribute("showPlayer", true)
+                group:SetAttribute("showPlayer", showPlayer)
                 group:SetAttribute("sortDir", sortDirection)
                 -- sorting
                 if profile == "RAID_PET" then
@@ -497,13 +505,13 @@ local function UpdateGridHeader(profile)
             end
         end
 
-        local point = DIRECTION_TO_GROUP_ANCHOR_POINT[settings.raidGrow[profile]]
+        local point = DIRECTION_TO_GROUP_ANCHOR_POINT[(settings.raidGrow[profile] or "DOWN+RIGHT")]
         if (isParty or raidWideSorting) and settings.startFromCenter[profile] then
-			point = DIRECTION_TO_GROUP_ANCHOR_POINT["OUT+" .. settings.raidGrow[profile]]
+			point = DIRECTION_TO_GROUP_ANCHOR_POINT["OUT+" .. (settings.raidGrow[profile] or "DOWN+RIGHT")]
 		end
 
         if lastGroup == 0 then
-            if DIRECTION_TO_POINT[settings.raidGrow[profile]] == "LEFT" or DIRECTION_TO_POINT[settings.raidGrow[profile]] == "RIGHT" then
+            if DIRECTION_TO_POINT[(settings.raidGrow[profile] or "DOWN+RIGHT")] == "LEFT" or DIRECTION_TO_POINT[(settings.raidGrow[profile] or "DOWN+RIGHT")] == "RIGHT" then
                 if group then group:SetPoint(point, header, point, 0, height * y) end
                 height = height + HEIGHT + groupSpacing
                 newRows = newRows + 1
@@ -513,7 +521,7 @@ local function UpdateGridHeader(profile)
                 newCols = newCols + 1
             end
         else
-            if DIRECTION_TO_POINT[settings.raidGrow[profile]] == "LEFT" or DIRECTION_TO_POINT[settings.raidGrow[profile]] == "RIGHT" then
+            if DIRECTION_TO_POINT[(settings.raidGrow[profile] or "DOWN+RIGHT")] == "LEFT" or DIRECTION_TO_POINT[(settings.raidGrow[profile] or "DOWN+RIGHT")] == "RIGHT" then
                 if newRows == 1 then
                     if group then group:SetPoint(point, header, point, width * x, 0) end
                     width = width + WIDTH_FIVE + groupSpacing

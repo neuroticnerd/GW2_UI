@@ -9,6 +9,7 @@ GW.privateDefaults = {
         PLAYER_TRACKED_DODGEBAR_SPELL_ID = 0,
         ISKAARAN_FISHING_NET_DATA = {},
         CHAT_KEYWORDS_ALERT_COLOR= {r = .5, g = .5, b = .5},
+        ChatHistoryLog = {},
     },
 }
 
@@ -235,6 +236,7 @@ GW.globalDefault = {
         CHAT_USE_GW2_STYLE= true,
         CHAT_NUM_SCROLL_MESSAGES= 3,
         CHAT_SCROLL_DOWN_INTERVAL= 15,
+        copyChatLines = false,
 
         target_TARGET_ENABLED= true,
         target_TARGET_SHOW_CASTBAR= true,
@@ -542,6 +544,20 @@ GW.globalDefault = {
         CHAT_KEYWORDS_EMOJI= true,
         CHAT_SOCIAL_LINK= true,
         CHAT_ADD_TIMESTAMP_TO_ALL= true,
+        chatHistory = true,
+        showHistory = { -- maybe as setting later
+            WHISPER = true,
+            GUILD = true,
+            PARTY = true,
+            RAID = true,
+            INSTANCE = true,
+            CHANNEL = true,
+            SAY = true,
+            YELL = true,
+            EMOTE = true
+        },
+        historySize = 100,
+        timeStampFormat = "NONE",
 
         ClasspowerBar_pos= {
             point= "BOTTOMLEFT",
@@ -627,6 +643,7 @@ GW.globalDefault = {
         -- Maintank
         RAID_MAINTANK_FRAMES_ENABLED= true,
         RAID_CLASS_COLOR_TANK= true,
+        RAID_HIDE_CLASS_ICON_TANK = false,
         RAID_UNIT_FLAGS_TANK= "NONE",
         RAID_UNIT_MARKERS_TANK= false,
         RAID_WIDTH_TANK= 120,
@@ -663,6 +680,7 @@ GW.globalDefault = {
         -- Raid Pet
         RAID_PET_FRAMES= false,
         RAID_CLASS_COLOR_PET= true, -- always
+        RAID_HIDE_CLASS_ICON_PET = false, -- always
         RAID_UNIT_FLAGS_PET= "NONE", -- always
         RAID_UNIT_MARKERS_PET= false,
         RAID_WIDTH_PET= 50,
@@ -698,6 +716,7 @@ GW.globalDefault = {
 
         -- RAID40
         RAID_CLASS_COLOR= false,
+        RAID_HIDE_CLASS_ICON = false,
         RAID_UNIT_FLAGS= "NONE",
         RAID_UNIT_MARKERS= false,
         RAID_WIDTH= 55,
@@ -734,6 +753,7 @@ GW.globalDefault = {
         -- RAID25
         RAID25_ENABLED= true,
         RAID_CLASS_COLOR_RAID25= false,
+        RAID_HIDE_CLASS_ICON_RAID25 = false,
         RAID_UNIT_FLAGS_RAID25= "NONE",
         RAID_UNIT_MARKERS_RAID25= false,
         RAID_WIDTH_RAID25= 55,
@@ -770,6 +790,7 @@ GW.globalDefault = {
         -- RAID10
         RAID10_ENABLED= true,
         RAID_CLASS_COLOR_RAID10= false,
+        RAID_HIDE_CLASS_ICON_RAID10 = false,
         RAID_UNIT_FLAGS_RAID10= "NONE",
         RAID_UNIT_MARKERS_RAID10= false,
         RAID_WIDTH_RAID10= 55,
@@ -805,6 +826,7 @@ GW.globalDefault = {
 
         -- Party Grid
         RAID_CLASS_COLOR_PARTY= true,
+        RAID_HIDE_CLASS_ICON_PARTY = false,
         RAID_UNIT_FLAGS_PARTY= "NONE",
         RAID_UNIT_MARKERS_PARTY= false,
         RAID_WIDTH_PARTY= 500,
@@ -829,6 +851,7 @@ GW.globalDefault = {
         RAID_SHOW_TANK_ICON_PARTY= true,
         RAID_SHOW_LEADER_ICON_PARTY= true,
         RAID_SHORT_HEALTH_VALUES_PARTY = false,
+        RAID_SHOW_PLAYER_PARTY = true, -- only for party grid
 
         raid_party_pos= {
             point= "TOPLEFT",
@@ -856,7 +879,9 @@ GW.globalDefault = {
         QUEST_REWARDS_MOST_VALUE_ICON= true,
         QUEST_XP_PERCENT= true,
         HUD_SCALE= 1,
-        MINIMAP_SCALE= 200,
+        MINIMAP_SIZE= 170,
+        MinimapScale = 1.2,
+        MinimapResetZoom = 0,
         MINIMAP_FPS= false,
         MINIMAP_FPS_TOOLTIP_DISABLED= false,
         MINIMAP_COORDS_TOGGLE= false,
@@ -867,6 +892,7 @@ GW.globalDefault = {
         WORLDMAP_COORDS_X_OFFSET= 0,
         WORLDMAP_COORDS_Y_OFFSET= 0,
 
+        showPlayerCastBarTicks = true,
         CASTINGBAR_DATA= true,
         USE_CHARACTER_WINDOW= true,
         USE_TALENT_WINDOW= true,
@@ -964,6 +990,10 @@ GW.globalDefault = {
         ALERTFRAME_NOTIFICATION_SPOULWELL_SOUND= "None",
         ALERTFRAME_NOTIFICATION_MAGE_PORTAL= true,
         ALERTFRAME_NOTIFICATION_MAGE_PORTAL_SOUND= "None",
+        alertFrameNotificatioFeast = true,
+        alertFrameNotificatioFeastSound= "None",
+        alertFrameNotificatioBot = true,
+        alertFrameNotificatioBotSound= "None",
 
         USE_BATTLEGROUND_HUD= true,
 
@@ -1062,10 +1092,14 @@ GW.globalDefault = {
         },
         player_pos_scale= 1,
 
+        --general raid tag update rate
+        tagUpdateRate = 0.2, -- eventTimerThreshold
+
         -- short healthvalue settings
         ShortHealthValuePrefixStyle = "ENGLISH",
         ShortHealthValuesDecimalLength = 0,
         PLAYER_UNIT_HEALTH_SHORT_VALUES = false,
+        PLAYER_UNIT_SHIELD_SHORT_VALUES = false,
         TARGET_UNIT_HEALTH_SHORT_VALUES = false,
         FOCUS_UNIT_HEALTH_SHORT_VALUES = false,
         PET_UNIT_HEALTH_SHORT_VALUES = false,

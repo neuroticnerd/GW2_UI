@@ -252,6 +252,14 @@ local function AddQuestID(frame)
     GameTooltip:Show()
 end
 
+local function AddBattlePetID()
+    if not BattlePetTooltip or not BattlePetTooltip.speciesID or not IsModKeyDown() then return end
+
+    BattlePetTooltip:AddLine(" ")
+    BattlePetTooltip:AddLine(format(IDLine, ID, BattlePetTooltip.speciesID))
+    BattlePetTooltip:Show()
+end
+
 local function GameTooltip_OnTooltipCleared(self)
     if self:IsForbidden() then return end
 
@@ -271,9 +279,10 @@ end
 local function GameTooltip_OnTooltipSetItem(self, data)
     if (self ~= GameTooltip and self ~= ShoppingTooltip1 and self ~= ShoppingTooltip2) or self:IsForbidden() then return end
 
-    local itemID, bagCount, bankCount
+    local itemID, bagCount, bankCount, stackSize
     local modKey = IsModKeyDown()
     local GetItem = TooltipUtil.GetDisplayedItem or self.GetItem
+
     if GetItem then
         local _, link = GetItem(self)
 
@@ -283,7 +292,7 @@ local function GameTooltip_OnTooltipSetItem(self, data)
             itemID = format(("*%s|r %s"):gsub("*", GW.Gw2Color), ID, (data and data.id) or strmatch(link, ":(%w+)"))
         end
 
-        if GW.settings.ADVANCED_TOOLTIP_OPTION_ITEMCOUNT then
+        if GW.settings.ADVANCED_TOOLTIP_OPTION_ITEMCOUNT ~= "NONE" or modKey then
             local count = C_Item.GetItemCount(link)
             local bank = C_Item.GetItemCount(link, true, nil, GW.settings.ADVANCED_TOOLTIP_OPTION_ITEMCOUNT_INCLUDE_REAGENTS, GW.settings.ADVANCED_TOOLTIP_OPTION_ITEMCOUNT_INCLUDE_WARBAND)
 
@@ -295,6 +304,11 @@ local function GameTooltip_OnTooltipSetItem(self, data)
                 bagCount = format(("*%s|r %d"):gsub("*", GW.Gw2Color), INVENTORY_TOOLTIP, count)
                 bankCount = format(("*%s|r %d"):gsub("*", GW.Gw2Color), BANK, (bank - count))
             end
+
+            local _, _, _, _, _, _, _, stack = C_Item.GetItemInfo(link)
+            if stack and stack > 1 then
+                stackSize = format(IDLine, L["Stack Size"], stack)
+            end
         end
 
         ScanKeystone(self, link)
@@ -305,9 +319,10 @@ local function GameTooltip_OnTooltipSetItem(self, data)
         end
     end
 
-    if itemID or bagCount or bankCount then self:AddLine(" ") end
+    if itemID or bagCount or bankCount or stackSize then self:AddLine(" ") end
     if itemID or bagCount then self:AddDoubleLine(itemID or " ", bagCount or " ") end
     if bankCount then self:AddDoubleLine(" ", bankCount) end
+    if stackSize then self:AddDoubleLine(" ", stackSize) end
 end
 
 local function GetLevelLine(self, offset, raw)
@@ -381,7 +396,7 @@ local function SetUnitText(self, unit, isPlayerUnit)
             local diffColor = GetCreatureDifficultyColor(level)
             local race, englishRace = UnitRace(unit)
             local _, localizedFaction = GW.GetUnitBattlefieldFaction(unit)
-            if localizedFaction and englishRace == "Pandaren" then race = localizedFaction .. " " .. race end
+            if localizedFaction and (englishRace == "Pandaren" or englishRace == "Dracthyr") then race = localizedFaction .. " " .. race end
             local hexColor = GW.RGBToHex(diffColor.r, diffColor.g, diffColor.b)
             local unitGender = GW.settings.ADVANCED_TOOLTIP_SHOW_GENDER and genderTable[gender]
             if level < realLevel then
@@ -664,11 +679,15 @@ local function GameTooltip_OnTooltipSetUnit(self, data)
         AddMythicInfo(self, unit)
     end
 
-    if isShiftKeyDown and color and not self.ItemLevelShown then
-        AddInspectInfo(self, unit, 0, color.r, color.g, color.b)
+    if isShiftKeyDown and isPlayerUnit and not InCombatLockdown() and not self.ItemLevelShown then
+        if color then
+            AddInspectInfo(self, unit, 0, color.r, color.g, color.b)
+        else
+            AddInspectInfo(self, unit, 0, 0.9, 0.9, 0.9)
+        end
     end
 
-    if unit and not isPlayerUnit and IsModKeyDown() and not C_PetBattles.IsInBattle() then
+    if not isPlayerUnit and IsModKeyDown() and not C_PetBattles.IsInBattle() then
         local guid = (data and data.guid) or UnitGUID(unit) or ""
         local id = tonumber(strmatch(guid, "%-(%d-)%-%x-$"), 10)
         if id then -- NPC ID"s
@@ -880,45 +899,6 @@ local function SkinQueueStatusFrame()
     })
 end
 
-local function SkinBattlePetTooltip()
-    local skin_battle_pet_tt = function(self)
-        self.NineSlice:Hide()
-        self:GwCreateBackdrop({
-            bgFile = "Interface/AddOns/GW2_UI/textures/uistuff/UI-Tooltip-Background",
-            edgeFile = "Interface/AddOns/GW2_UI/textures/uistuff/UI-Tooltip-Border",
-            tile = false,
-            tileSize = 64,
-            edgeSize = 32,
-            insets = {left = 2, right = 2, top = 2, bottom = 2}
-        })
-    end
-
-    hooksecurefunc("SharedPetBattleAbilityTooltip_SetAbility", function(self) skin_battle_pet_tt(self) end)
-    hooksecurefunc("FloatingBattlePet_Show", function()
-        if FloatingBattlePetTooltip:IsShown() then
-            FloatingBattlePetTooltip.CloseButton:SetNormalTexture("Interface/AddOns/GW2_UI/textures/uistuff/window-close-button-normal")
-            FloatingBattlePetTooltip.CloseButton:SetHighlightTexture("Interface/AddOns/GW2_UI/textures/uistuff/window-close-button-hover")
-            FloatingBattlePetTooltip.CloseButton:SetPushedTexture("Interface/AddOns/GW2_UI/textures/uistuff/window-close-button-hover")
-            FloatingBattlePetTooltip.CloseButton:SetSize(20, 20)
-            FloatingBattlePetTooltip.CloseButton:ClearAllPoints()
-            FloatingBattlePetTooltip.CloseButton:SetPoint("TOPRIGHT", -3, -3)
-
-            skin_battle_pet_tt(FloatingBattlePetTooltip)
-        end
-    end)
-
-    hooksecurefunc("BattlePetToolTip_Show", function()
-        if not BattlePetTooltip then return end
-        skin_battle_pet_tt(BattlePetTooltip)
-
-        if not BattlePetTooltip.speciesID or not IsModKeyDown() then return end
-
-        BattlePetTooltip:AddLine(" ")
-        BattlePetTooltip:AddLine(format(IDLine, ID, BattlePetTooltip.speciesID))
-        BattlePetTooltip:Show()
-    end)
-end
-
 local function shouldHiddenInCombat(tooltip)
     local _, unit = tooltip:GetUnit()
     if unit then
@@ -1020,7 +1000,6 @@ local function AddPremadeGroupInfo(tooltip, resultID)
 
     tooltip:Show()
 end
-
 local function StyleTooltips()
     for _, tt in next, {
         ItemRefTooltip,
@@ -1038,6 +1017,7 @@ local function StyleTooltips()
         QuickKeybindTooltip,
         GameSmallHeaderTooltip,
         PetJournalPrimaryAbilityTooltip,
+        PetJournalSecondaryAbilityTooltip,
         GarrisonShipyardMapMissionTooltip,
         BattlePetTooltip,
         PetBattlePrimaryAbilityTooltip,
@@ -1085,7 +1065,12 @@ local function StyleTooltips()
         EventTraceTooltip,
         FrameStackTooltip,
         LibDBIconTooltip,
-        RepurationParagonTooltip
+        RepurationParagonTooltip,
+        BattlePetTooltip,
+        PetBattlePrimaryAbilityTooltip,
+        PetBattlePrimaryUnitTooltip,
+        FloatingBattlePetTooltip,
+        FloatingPetBattleAbilityTooltip
     } do
         SetStyle(tt)
     end
@@ -1095,9 +1080,16 @@ local function LoadTooltips()
     StyleTooltips()
     SkinItemRefTooltipCloseButton()
     SkinQueueStatusFrame()
-    SkinBattlePetTooltip()
 
     QuestScrollFrame.StoryTooltip:SetFrameLevel(4)
+
+    FloatingBattlePetTooltip.CloseButton:SetNormalTexture("Interface/AddOns/GW2_UI/textures/uistuff/window-close-button-normal")
+    FloatingBattlePetTooltip.CloseButton:SetHighlightTexture("Interface/AddOns/GW2_UI/textures/uistuff/window-close-button-hover")
+    FloatingBattlePetTooltip.CloseButton:SetPushedTexture("Interface/AddOns/GW2_UI/textures/uistuff/window-close-button-hover")
+    FloatingBattlePetTooltip.CloseButton:SetSize(20, 20)
+    FloatingBattlePetTooltip.CloseButton:ClearAllPoints()
+    FloatingBattlePetTooltip.CloseButton:SetPoint("TOPRIGHT", -3, -3)
+    hooksecurefunc("SharedPetBattleAbilityTooltip_SetAbility", SetStyle)
 
     local ItemTT = GameTooltip.ItemTooltip
     GW.HandleIcon(ItemTT.Icon, true)
@@ -1159,6 +1151,7 @@ local function LoadTooltips()
 
         hooksecurefunc("QuestMapLogTitleButton_OnEnter", AddQuestID)
         hooksecurefunc("TaskPOI_OnEnter", AddQuestID)
+        hooksecurefunc("BattlePetToolTip_Show", AddBattlePetID)
         hooksecurefunc(GameTooltip, "SetHyperlink", SetHyperlink)
         hooksecurefunc(ItemRefTooltip, "SetHyperlink", SetHyperlink)
 
@@ -1167,8 +1160,8 @@ local function LoadTooltips()
         eventFrame:SetScript("OnEvent", function()
             if not GameTooltip:IsForbidden() and GameTooltip:IsShown() then
                 local owner = GameTooltip:GetOwner()
-                if (owner == UIParent or (GW2_PlayerFrame and owner == GW2_PlayerFrame)) and UnitExists("mouseover") then
-                    GameTooltip:SetUnit("mouseover")
+                if (owner == UIParent or (GW2_PlayerFrame and owner == GW2_PlayerFrame) or (GwPlayerUnitFrame and owner == GwPlayerUnitFrame)) and UnitExists("mouseover") then
+                    GameTooltip:RefreshData()
                 end
             end
         end)
